@@ -189,3 +189,101 @@ button {
 .level-unknown {
   color: var(--gauge-unknown);
 }
+
+/* Session list */
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.session-row {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.session-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.session-repo {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-title {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-status {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.session-status--busy {
+  color: var(--status-busy);
+}
+.session-status--waiting {
+  color: var(--status-waiting);
+}
+.session-status--idle,
+.session-status--unknown {
+  color: var(--status-idle);
+}
+
+.session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: 12px;
+}
+
+.session-model {
+  color: var(--color-text);
+}
+
+.session-branch {
+  font-family: var(--font-mono);
+  color: var(--color-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.effort-badge {
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 18px;
+  border: 1px solid currentColor;
+  color: var(--color-text-muted);
+}
+.effort-badge--low {
+  color: var(--color-text-muted);
+}
+.effort-badge--medium {
+  color: var(--gauge-normal);
+}
+.effort-badge--high {
+  color: var(--gauge-warning);
+}
+.effort-badge--max {
+  color: var(--color-accent);
+}

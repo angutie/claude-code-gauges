@@ -5,6 +5,7 @@
     "lib": ["ES2023"],
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "types": ["node"],
     "strict": true,
     "noUnusedLocals": true,
@@ -22,6 +23,7 @@
     "src/preload/**/*",
     "src/shared/**/*",
     "src/renderer/**/*.ts",
+    "src/renderer/components/**/*.tsx",
     "tests/**/*"
   ]
 }

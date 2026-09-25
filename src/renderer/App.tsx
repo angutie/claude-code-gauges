@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import type { Account, AccountSnapshot } from '../shared/types'
+import { WIDGET_KEYS, type Account, type AccountSnapshot, type WidgetToggles } from '../shared/types'
+import { SessionList } from './components/SessionList'
 import {
   accountLabel,
   getGaugesStore,
@@ -9,6 +10,8 @@ import {
   type GaugesStore
 } from './store'
 import './styles.css'
+
+const DEFAULT_WIDGETS = Object.fromEntries(WIDGET_KEYS.map((key) => [key, true])) as WidgetToggles
 
 interface AppProps {
   store?: GaugesStore
@@ -58,7 +61,13 @@ function AccountTabBar({
   )
 }
 
-function AccountPanel({ snapshot }: { snapshot: AccountSnapshot | null }): React.JSX.Element {
+function AccountPanel({
+  snapshot,
+  widgets
+}: {
+  snapshot: AccountSnapshot | null
+  widgets: WidgetToggles
+}): React.JSX.Element {
   if (!snapshot) {
     return (
       <StateMessage>
@@ -73,16 +82,7 @@ function AccountPanel({ snapshot }: { snapshot: AccountSnapshot | null }): React
         <h2 className="panel-title">Usage</h2>
         <p className="muted">{snapshot.usage.message ?? `Status: ${snapshot.usage.status}`}</p>
       </section>
-      <section className="panel" aria-label="Sessions">
-        <h2 className="panel-title">Sessions</h2>
-        {snapshot.sessions.length === 0 ? (
-          <p className="muted">No running Claude Code sessions.</p>
-        ) : (
-          <p>
-            {snapshot.sessions.length} watched session{snapshot.sessions.length === 1 ? '' : 's'}
-          </p>
-        )}
-      </section>
+      <SessionList sessions={snapshot.sessions} widgets={widgets} />
     </>
   )
 }
@@ -113,7 +113,7 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
   } else if (!activeAccount) {
     content = <StateMessage>No accounts linked yet. Add a Claude config directory to get started.</StateMessage>
   } else {
-    content = <AccountPanel snapshot={activeSnapshot} />
+    content = <AccountPanel snapshot={activeSnapshot} widgets={config?.widgets ?? DEFAULT_WIDGETS} />
   }
 
   return (
