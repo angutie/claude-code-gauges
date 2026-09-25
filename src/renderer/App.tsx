@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
-import { WIDGET_KEYS, type Account, type AccountSnapshot, type WidgetToggles } from '../shared/types'
+import { WIDGET_KEYS, type AccountSnapshot, type WidgetToggles } from '../shared/types'
+import { AccountTabs } from './components/AccountTabs'
 import { SessionList } from './components/SessionList'
 import { UsagePanel } from './components/UsageGauge'
 import {
-  accountLabel,
   getGaugesStore,
   selectActiveAccount,
   selectActiveSnapshot,
@@ -29,36 +29,6 @@ function StateMessage({
     <div className={variant ? `state-message state-message--${variant}` : 'state-message'} role="status">
       {children}
     </div>
-  )
-}
-
-function AccountTabBar({
-  accounts,
-  activeId,
-  snapshots,
-  onSelect
-}: {
-  accounts: Account[]
-  activeId: string | null
-  snapshots: Record<string, AccountSnapshot>
-  onSelect: (id: string) => void
-}): React.JSX.Element | null {
-  if (accounts.length === 0) return null
-  return (
-    <nav className="app-tabs" role="tablist" aria-label="Accounts">
-      {accounts.map((account) => (
-        <button
-          key={account.id}
-          type="button"
-          role="tab"
-          className="app-tab"
-          aria-selected={account.id === activeId}
-          onClick={() => onSelect(account.id)}
-        >
-          {accountLabel(account, snapshots[account.id])}
-        </button>
-      ))}
-    </nav>
   )
 }
 
@@ -109,7 +79,7 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
   } else if (status === 'error') {
     content = <StateMessage variant="error">Could not load data: {error ?? 'unknown error'}</StateMessage>
   } else if (!activeAccount) {
-    content = <StateMessage>No accounts linked yet. Add a Claude config directory to get started.</StateMessage>
+    content = <StateMessage>No accounts linked yet. Use “Add account” to pick a Claude config directory.</StateMessage>
   } else {
     content = <AccountPanel snapshot={activeSnapshot} widgets={config?.widgets ?? DEFAULT_WIDGETS} />
   }
@@ -121,12 +91,18 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
           <span className="app-title-accent">Claude Code</span> Gauges
         </h1>
       </header>
-      <AccountTabBar
-        accounts={config?.accounts ?? []}
-        activeId={activeAccount?.id ?? null}
-        snapshots={snapshots}
-        onSelect={(id) => void store.setActiveAccount(id)}
-      />
+      {status === 'ready' && (
+        <AccountTabs
+          accounts={config?.accounts ?? []}
+          activeId={activeAccount?.id ?? null}
+          snapshots={snapshots}
+          onSelect={(id) => void store.setActiveAccount(id)}
+          onAdd={() => store.api.addAccount()}
+          onRemove={async (id) => {
+            await store.api.removeAccount(id)
+          }}
+        />
+      )}
       <main className="app-main">{content}</main>
     </div>
   )
