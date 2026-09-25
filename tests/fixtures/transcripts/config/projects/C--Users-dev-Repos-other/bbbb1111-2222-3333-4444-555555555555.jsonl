@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"hi"},"isSidechain":false,"sessionId":"bbbb1111-2222-3333-4444-555555555555","timestamp":"2026-09-25T11:00:00.000Z"}
+{"type":"agent-name","agentName":"Refactor billing","sessionId":"bbbb1111-2222-3333-4444-555555555555"}

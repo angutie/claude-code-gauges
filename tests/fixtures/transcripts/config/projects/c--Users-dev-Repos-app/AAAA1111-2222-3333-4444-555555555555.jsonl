@@ -1,0 +1,8 @@
+{"type":"user","message":{"role":"user","content":"hello"},"isSidechain":false,"sessionId":"aaaa1111-2222-3333-4444-555555555555","timestamp":"2026-09-25T10:00:00.000Z"}
+{"type":"custom-title","customTitle":"Fix login flow","sessionId":"aaaa1111-2222-3333-4444-555555555555"}
+{"type":"assistant","message":{"model":"claude-sonnet-5","role":"assistant","usage":{"input_tokens":10,"output_tokens":5}},"effort":"high","perTurnEffort":"high","gitBranch":"main","isSidechain":false,"sessionId":"aaaa1111-2222-3333-4444-555555555555","timestamp":"2026-09-25T10:00:05.000Z"}
+{"type":"assistant","message":{"model":"claude-opus-5-5","role":"assistant"
+{"type":"assistant","message":{"model":"claude-opus-5-5","role":"assistant"},"effort":"max","perTurnEffort":"max","gitBranch":"feature/login","isSidechain":false,"sessionId":"aaaa1111-2222-3333-4444-555555555555","timestamp":"2026-09-25T10:01:00.000Z"}
+{"type":"assistant","message":{"model":"claude-haiku-5","role":"assistant"},"effort":"low","perTurnEffort":"low","gitBranch":"subagent-branch","isSidechain":true,"sessionId":"aaaa1111-2222-3333-4444-555555555555","timestamp":"2026-09-25T10:02:00.000Z"}
+not json at all
+{"type":"mode","mode":"normal","sessionId":"aaaa1111-2222-3333-4444-555555555555"}
