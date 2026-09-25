@@ -287,3 +287,97 @@ button {
 .effort-badge--max {
   color: var(--color-accent);
 }
+
+/* Usage gauges */
+.usage-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.usage-updated {
+  font-size: 11px;
+}
+
+.usage-notice {
+  margin: 0 0 var(--space-2);
+  font-size: 12px;
+}
+.usage-notice code {
+  font-family: var(--font-mono);
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--color-surface-raised);
+}
+.usage-notice--expired,
+.usage-notice--stale {
+  color: var(--gauge-warning);
+}
+.usage-notice--error {
+  color: var(--status-error);
+}
+
+.usage-gauges {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.usage-gauge-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.usage-gauge-label {
+  font-weight: 600;
+}
+
+.usage-gauge-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.usage-gauge--primary .usage-gauge-value {
+  font-size: 16px;
+}
+
+.usage-gauge-bar {
+  display: block;
+}
+
+.usage-gauge-bar rect {
+  transition: width 0.3s ease;
+}
+
+.usage-gauge-foot {
+  margin-top: 2px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-gauge--stale {
+  opacity: 0.6;
+}
+
+.usage-secondary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-border);
+}
+
+.usage-gauge--secondary .usage-gauge-label {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.usage-gauge--secondary .usage-gauge-value {
+  font-size: 12px;
+}

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { WIDGET_KEYS, type Account, type AccountSnapshot, type WidgetToggles } from '../shared/types'
 import { SessionList } from './components/SessionList'
+import { UsagePanel } from './components/UsageGauge'
 import {
   accountLabel,
   getGaugesStore,
@@ -78,10 +79,7 @@ function AccountPanel({
   }
   return (
     <>
-      <section className="panel" aria-label="Usage">
-        <h2 className="panel-title">Usage</h2>
-        <p className="muted">{snapshot.usage.message ?? `Status: ${snapshot.usage.status}`}</p>
-      </section>
+      <UsagePanel usage={snapshot.usage} widgets={widgets} tokenStatus={snapshot.identity?.tokenStatus} />
       <SessionList sessions={snapshot.sessions} widgets={widgets} />
     </>
   )
