@@ -16,7 +16,7 @@ function render(activeId: string | null, snapshots: Record<string, AccountSnapsh
       activeId,
       snapshots,
       onSelect: () => undefined,
-      onAdd: async () => ({ ok: false, error: 'nope' }),
+      onAdd: async () => ({ ok: false as const, error: 'nope' }),
       onRemove: async () => undefined
     })
   )
@@ -50,7 +50,7 @@ describe('AccountTabs', () => {
         activeId: null,
         snapshots: {},
         onSelect: () => undefined,
-        onAdd: async () => ({ ok: false, cancelled: true, error: '' }),
+        onAdd: async () => ({ ok: false as const, cancelled: true, error: '' }),
         onRemove: async () => undefined
       })
     )

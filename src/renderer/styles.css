@@ -441,3 +441,84 @@ button {
 .usage-gauge--secondary .usage-gauge-value {
   font-size: 12px;
 }
+
+/* Session picker & settings */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  accent-color: var(--color-accent);
+}
+
+.session-picker-summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.session-picker-summary .panel-title {
+  margin: 0;
+}
+
+.session-picker-options,
+.settings-group {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.session-picker-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-picker-empty,
+.settings-hint {
+  margin: var(--space-1) 0 0;
+  font-size: 12px;
+}
+
+.settings-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.settings-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-input {
+  width: 80px;
+  padding: 2px var(--space-2);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+}

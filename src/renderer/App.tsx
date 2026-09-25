@@ -1,7 +1,9 @@
-import { useEffect } from 'react'
-import { WIDGET_KEYS, type AccountSnapshot, type WidgetToggles } from '../shared/types'
+import { useEffect, useState } from 'react'
+import { WIDGET_KEYS, type AccountSnapshot, type WatchedSessions, type WidgetToggles } from '../shared/types'
 import { AccountTabs } from './components/AccountTabs'
 import { SessionList } from './components/SessionList'
+import { SessionPicker } from './components/SessionPicker'
+import { SettingsPanel } from './components/SettingsPanel'
 import { UsagePanel } from './components/UsageGauge'
 import {
   getGaugesStore,
@@ -34,10 +36,14 @@ function StateMessage({
 
 function AccountPanel({
   snapshot,
-  widgets
+  widgets,
+  watched,
+  onWatchedChange
 }: {
   snapshot: AccountSnapshot | null
   widgets: WidgetToggles
+  watched: WatchedSessions | undefined
+  onWatchedChange: (watched: WatchedSessions) => void
 }): React.JSX.Element {
   if (!snapshot) {
     return (
@@ -50,6 +56,9 @@ function AccountPanel({
   return (
     <>
       <UsagePanel usage={snapshot.usage} widgets={widgets} tokenStatus={snapshot.identity?.tokenStatus} />
+      {widgets.sessions && (
+        <SessionPicker sessions={snapshot.availableSessions} watched={watched} onChange={onWatchedChange} />
+      )}
       <SessionList sessions={snapshot.sessions} widgets={widgets} />
     </>
   )
@@ -62,6 +71,7 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
   const snapshots = useGauges((s) => s.snapshots, store)
   const activeAccount = useGauges(selectActiveAccount, store)
   const activeSnapshot = useGauges(selectActiveSnapshot, store)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
     void store.init()
@@ -81,7 +91,18 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
   } else if (!activeAccount) {
     content = <StateMessage>No accounts linked yet. Use “Add account” to pick a Claude config directory.</StateMessage>
   } else {
-    content = <AccountPanel snapshot={activeSnapshot} widgets={config?.widgets ?? DEFAULT_WIDGETS} />
+    const accountId = activeAccount.id
+    content = (
+      <AccountPanel
+        snapshot={activeSnapshot}
+        widgets={config?.widgets ?? DEFAULT_WIDGETS}
+        watched={config?.watchedSessionIds[accountId]}
+        onWatchedChange={(watched) => {
+          const current = store.getState().config?.watchedSessionIds ?? {}
+          void store.setConfig({ watchedSessionIds: { ...current, [accountId]: watched } })
+        }}
+      />
+    )
   }
 
   return (
@@ -90,6 +111,16 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
         <h1 className="app-title">
           <span className="app-title-accent">Claude Code</span> Gauges
         </h1>
+        {status === 'ready' && config && (
+          <button
+            type="button"
+            className="button"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            Settings
+          </button>
+        )}
       </header>
       {status === 'ready' && (
         <AccountTabs
@@ -103,7 +134,16 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
           }}
         />
       )}
-      <main className="app-main">{content}</main>
+      <main className="app-main">
+        {settingsOpen && status === 'ready' && config && (
+          <SettingsPanel
+            config={config}
+            onChange={(patch) => void store.setConfig(patch)}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
+        {content}
+      </main>
     </div>
   )
 }
