@@ -1,7 +1,13 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import type { AppConfig } from '../src/shared/types'
+import App from '../src/renderer/App'
+import { createEmptyConfig, createFallbackApi } from '../src/renderer/api'
+import { createGaugesStore } from '../src/renderer/store'
 
 interface CssRule {
   selectors: string[]
@@ -183,4 +189,47 @@ describe('max scrollbar integration: scrolling and the mini layout stay intact',
       expect(normalize(css.slice(miniBannerOffset))).toBe(normalize(baseMini ?? ''))
     }
   )
+})
+
+// The CSS selectors only work if the rendered markup matches them: max mode must render the
+// scrollers inside a `.app` root without `.mini`, and mini mode must not render them at all.
+describe('max scrollbar integration: selectors match the rendered shells', () => {
+  async function renderApp(windowMode: AppConfig['windowMode']): Promise<string> {
+    const config: AppConfig = {
+      ...createEmptyConfig(),
+      accounts: [{ id: 'a', label: '', configDir: '/home/me/.claude' }],
+      activeAccountId: 'a',
+      windowMode
+    }
+    const store = createGaugesStore(createFallbackApi(config, []))
+    await store.init()
+    return renderToStaticMarkup(createElement(App, { store }))
+  }
+
+  function rootClasses(html: string): string[] {
+    const match = /^<div class="([^"]*)"/.exec(html)
+    return match ? match[1].split(/\s+/) : []
+  }
+
+  function hasClass(html: string, className: string): boolean {
+    return new RegExp(`class="(?:[^"]*\s)?${className}(?:\s[^"]*)?"`).test(html)
+  }
+
+  it('max mode renders .app-main and .app-tabs under a non-mini .app root', async () => {
+    const html = await renderApp('max')
+    const classes = rootClasses(html)
+    expect(classes).toContain('app')
+    expect(classes).not.toContain('mini')
+    for (const scroller of SCROLLERS) {
+      expect(hasClass(html, scroller.slice(1)), scroller).toBe(true)
+    }
+  })
+
+  it('mini mode renders a .app.mini root with neither max scroller', async () => {
+    const html = await renderApp('mini')
+    expect(rootClasses(html)).toEqual(expect.arrayContaining(['app', 'mini']))
+    for (const scroller of SCROLLERS) {
+      expect(hasClass(html, scroller.slice(1)), scroller).toBe(false)
+    }
+  })
 })
