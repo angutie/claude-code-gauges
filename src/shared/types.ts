@@ -49,6 +49,11 @@ export interface WindowBounds {
   height: number
 }
 
+/** 'max' is the full layout; 'mini' is the compact 1:1 carousel window. */
+export type WindowMode = 'max' | 'mini'
+
+export const WINDOW_MODES: readonly WindowMode[] = ['max', 'mini']
+
 export interface AppConfig {
   accounts: Account[]
   activeAccountId: string | null
@@ -58,6 +63,9 @@ export interface AppConfig {
   usagePollSeconds: number
   alwaysOnTop: boolean
   windowBounds: WindowBounds | null
+  windowMode: WindowMode
+  /** Bounds of the mini window, persisted separately from the max-mode windowBounds. */
+  miniWindowBounds: WindowBounds | null
 }
 
 // ---------------------------------------------------------------------------
