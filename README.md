@@ -47,6 +47,7 @@ Packaging into an installer (electron-builder) isn't set up yet. Use `npm run bu
   - **Window: min / max**: switch between the full window and the [mini window](#mini-mode)
 - Gauge colors: normal below 70%, warning from 70% to 90%, critical above 90%. When a value can't be fetched the gauge shows `unknown`, a stale marker, or `Token expired, run \`claude\` to refresh`.
 - Usage refreshes on the poll timer and also when the window gains focus.
+- **Scrollbars** (max window only): the main content area and the account tab strip use narrow (4px) scrollbars with a transparent track. The thumb is hidden until you hover over the area that scrolls. Scrolling with the wheel, trackpad, or keyboard works as usual. To change the look, edit the `--scrollbar-size` and `--scrollbar-thumb` tokens in `:root` in `src/renderer/styles.css`. Mini mode doesn't scroll, so it has no scrollbars.
 
 Settings, linked accounts, window mode, and the window size and position for each mode are saved to `config.json` in Electron's `userData` folder (`%APPDATA%\claude-code-gauges\` on Windows). Writes are atomic. If the file is corrupt, the app starts with the defaults.
 
