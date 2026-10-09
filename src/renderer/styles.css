@@ -804,22 +804,29 @@ button {
 /* Max window scrollbars
    Webkit pseudo-elements only: Chromium 121+ ignores them on any element that
    sets scrollbar-width or scrollbar-color, so those must stay unset here. */
-.app:not(.mini) .app-main::-webkit-scrollbar {
+/* Width sizes the vertical bar (.app-main), height the horizontal one (.app-tabs). */
+.app:not(.mini) .app-main::-webkit-scrollbar,
+.app:not(.mini) .app-tabs::-webkit-scrollbar {
   width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
   background: transparent;
 }
 
 .app:not(.mini) .app-main::-webkit-scrollbar-track,
-.app:not(.mini) .app-main::-webkit-scrollbar-corner {
+.app:not(.mini) .app-main::-webkit-scrollbar-corner,
+.app:not(.mini) .app-tabs::-webkit-scrollbar-track,
+.app:not(.mini) .app-tabs::-webkit-scrollbar-corner {
   background: transparent;
 }
 
-.app:not(.mini) .app-main::-webkit-scrollbar-thumb {
+.app:not(.mini) .app-main::-webkit-scrollbar-thumb,
+.app:not(.mini) .app-tabs::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 999px;
 }
 
-.app:not(.mini) .app-main:hover::-webkit-scrollbar-thumb {
+.app:not(.mini) .app-main:hover::-webkit-scrollbar-thumb,
+.app:not(.mini) .app-tabs:hover::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
 }
 
