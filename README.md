@@ -47,7 +47,25 @@ Packaging into an installer (electron-builder) isn't set up yet. Use `npm run bu
   - **Window: min / max**: switch between the full window and the [mini window](#mini-mode)
 - Gauge colors: normal below 70%, warning from 70% to 90%, critical above 90%. When a value can't be fetched the gauge shows `unknown`, a stale marker, or `Token expired, run \`claude\` to refresh`.
 - Usage refreshes on the poll timer and also when the window gains focus.
+- **Help**: the [built-in help](#help) explains every setting and feature.
 - **Scrollbars** (max window only): the main content area and the account tab strip use narrow (4px) scrollbars with a transparent track. The thumb is hidden until you hover over the area that scrolls. Scrolling with the wheel, trackpad, or keyboard works as usual. To change the look, edit the `--scrollbar-size` and `--scrollbar-thumb` tokens in `:root` in `src/renderer/styles.css`. Mini mode doesn't scroll, so it has no scrollbars.
+
+### Help
+
+The app has a built-in help reference with five topics:
+
+- **Getting started**: adding and removing accounts, and choosing which tabs and sessions to track
+- **Settings reference**: what each widget toggle, the poll interval, Always on top, and the min / max window setting do
+- **Features**: the usage gauges, the sessions list, and the Playground, each with the settings that affect it
+- **Mini vs max**: how the two window sizes differ, how to switch, and how to move around the mini carousel
+- **Glossary**: short definitions of terms such as session, config dir, effort, 5h window, weekly window, stale, and expired
+
+How to open it:
+
+- **Max window:** click **Help** in the header, next to **Settings**. The Help button is there in every state, including while loading, after an error, and before any account is linked. Help opens above the content and scrolls with it. Click **Done** or **Help** again to close it. Help and Settings can't be open together: opening one closes the other.
+- **Mini window:** go to the **Help** screen in the carousel, or click the **?** button in the drag strip at the top. The **?** button works in every mini state, including the error and "no accounts" messages. Click **Done** or **?** again to go back to where you were. Mini help starts with a list of topics. Pick one to read it one short card at a time with the **‹** / **›** buttons, and use **Back** to return to the list. These are buttons only, so **←** / **→** still move the carousel.
+
+Help text is built from the same constants the app uses (widget labels, poll limits, gauge thresholds, spawn rate, mini screen order), so it stays in step with the code. Whether Help is open isn't saved.
 
 Settings, linked accounts, window mode, and the window size and position for each mode are saved to `config.json` in Electron's `userData` folder (`%APPDATA%\claude-code-gauges\` on Windows). Writes are atomic. If the file is corrupt, the app starts with the defaults.
 
@@ -67,24 +85,25 @@ The setting is saved as `windowMode` (`"max"` by default), so the app reopens in
 - The mini window keeps a **1:1 aspect ratio** while you resize it. It opens at **400 × 400** (content size) and can shrink to **260 × 260**.
 - Each mode saves its own size and position: `windowBounds` for max and `miniWindowBounds` for mini. Switching modes puts the window back where that mode was last used. Saved bounds that are off-screen are ignored.
 - The full window keeps its usual limits: it opens at 420 × 640 and can shrink to 320 × 400.
-- Drag the strip at the top of the mini window to move it. The strip also shows the active account's name. To switch accounts, go back to max.
+- Drag the strip at the top of the mini window to move it. The strip also shows the active account's name and a **?** button that opens [Help](#help). To switch accounts, go back to max.
 - Text and gauges scale with the window size, and no mini screen scrolls.
 
 ### Carousel navigation
 
-The screens come in this order: **Gauges → Sessions → Settings → Playground**. The carousel loops, so moving forward from Playground goes back to Gauges, and moving back from Gauges goes to Playground.
+The screens come in this order: **Gauges → Sessions → Settings → Help → Playground**. The carousel loops, so moving forward from Playground goes back to Gauges, and moving back from Gauges goes to Playground.
 
 - **Horizontal scroll:** swipe sideways on a trackpad, or hold **Shift** and turn the mouse wheel. Each gesture moves exactly **one** screen. Wheel movement has to pass a small threshold (60 px) before the screen changes. After that there is a short cooldown (450 ms), so one long swipe can't skip several screens.
 - **Arrow keys:** when the carousel has focus, **←** and **→** move one screen. They are ignored while you are typing in a text field.
 - **Pager dots:** the dots at the bottom show which screen you are on. Click a dot to jump straight to that screen.
 
-Only the current screen is mounted. The playground simulation and the settings form never run twice.
+Only the current screen is mounted. The playground simulation and the settings form never run twice. Opening Help with the **?** button replaces the carousel until you close it, and you return to the screen you left.
 
 | Screen     | Contents                                                                                     |
 | ---------- | -------------------------------------------------------------------------------------------- |
 | Gauges     | 5h and weekly gauges with reset times (Opus/Sonnet bars if enabled), plus a one-line notice when data is expired, stale, or failed to load |
 | Sessions   | One line per session (repo · status · model · effort). Sessions that don't fit are summarized as `+N more` |
 | Settings   | The same settings as the full window, in a compact two-column layout, including the min / max toggle |
+| Help       | The [help](#help) topics as a list. Pick one to page through short cards with Back and ‹ / › buttons. The **?** button in the drag strip opens the same help from any state |
 | Playground | The pet playground (mini mode only)                                                          |
 
 ### Pet playground
@@ -173,10 +192,12 @@ Everything is read-only. The app never writes to a Claude Code config directory.
  └─────────────┼────────────────────────────────────────────────────────────┘
  ┌─────────────▼──────── renderer (React, display only) ────────────────────┐
  │  store ─► App ─┬─ max:  AccountTabs · SessionPicker · SessionList ·      │
- │                │        UsageGauge · SettingsPanel                       │
+ │                │        UsageGauge · SettingsPanel · HelpPanel           │
  │                └─ mini: MiniApp ─► Carousel ─► compact UsagePanel ·      │
  │                         compact SessionList · compact SettingsPanel ·    │
- │                         Playground (canvas)                              │
+ │                         compact HelpPanel · Playground (canvas)          │
+ │                         (drag-strip "?" ─► compact HelpPanel)            │
+ │  help-content.ts (topics as typed data) ─► HelpPanel                     │
  └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -184,6 +205,7 @@ Everything is read-only. The app never writes to a Claude Code config directory.
 - The **renderer only displays data**. It runs with `contextIsolation: true` and `nodeIntegration: false`, and can reach main only through the `window.gauges` bridge.
 - **Window modes**: `App` renders `MiniApp` when `config.windowMode === 'mini'`, and the usual layout otherwise. Switching modes is an ordinary `setConfig({ windowMode })` call. In main, `applyWindowConfig` notices the mode change and applies that mode's geometry (aspect-ratio lock, minimum size, saved or default bounds). It uses `windowGeometryForMode` from `src/main/window-mode.ts`. Bounds are saved under `boundsKeyForMode(mode)`.
 - **Mini logic is kept apart from the DOM**: carousel index and wheel math, the spawn rate, the pet simulation, and the sprites live in plain `.ts` modules with no DOM types. They are unit-tested in Vitest's node environment. Only `Carousel.tsx` and `Playground.tsx` touch the DOM (wheel listener, `requestAnimationFrame`, canvas, `ResizeObserver`).
+- **Help is data plus one component**: `src/renderer/help-content.ts` holds the help topics (`HELP_TOPICS`) as typed data built from the app's own constants (`WIDGET_OPTIONS`, poll limits, `USAGE_THRESHOLDS`, spawn-rate values, `MINI_SCREEN_IDS`). `components/HelpPanel.tsx` renders all of it in max, or a topic index plus paged cards when `compact`. The paging logic lives in `help-paging.ts`. Open/closed state is local React state, so Help needs no config, IPC, or main-process changes.
 - Types shared by all three layers live in `src/shared/types.ts`. IPC channel names live in one place, `src/shared/ipc-channels.ts`.
 - Every source is fault-tolerant:
   - A malformed JSONL line is skipped.
@@ -198,10 +220,13 @@ src/
   main/sources/  account-reader.ts, sessions-registry.ts,
                  transcript-tail.ts, usage-api.ts
   preload/    index.ts (contextBridge API), index.d.ts
-  renderer/   App.tsx, store.ts, api.ts, styles.css, theme.ts,
-              components/, utils/
+  renderer/   App.tsx (header Help / Settings buttons), store.ts, api.ts,
+              styles.css, theme.ts, components/ (incl. HelpPanel.tsx), utils/
+              help-content.ts    help topics as typed data (HELP_TOPICS)
+              help-paging.ts     compact help: topic index + card paging
   renderer/mini/
-              MiniApp.tsx        mini shell: drag strip, state messages, screen list
+              MiniApp.tsx        mini shell: drag strip ("?" help), state messages, screen list
+              screen-ids.ts      MINI_SCREEN_IDS (carousel order)
               Carousel.tsx       infinite carousel: wheel, arrow keys, pager dots, ARIA
               carousel-logic.ts  nextIndex wrap, visibleSlots, wheel-gesture reducer
               Playground.tsx     canvas + rAF loop, resize, visibility/reduced-motion

@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { Account, AccountSnapshot, AppConfig } from '../../shared/types'
+import { HelpPanel } from '../components/HelpPanel'
 import { SessionList } from '../components/SessionList'
 import { SettingsPanel, WindowModeToggle } from '../components/SettingsPanel'
 import { StateMessage } from '../components/StateMessage'
@@ -26,8 +28,8 @@ export interface MiniScreen extends CarouselScreen {
   miniOnly?: boolean
 }
 
-/** Screen ids in carousel order. */
-export const MINI_SCREEN_IDS = ['gauges', 'sessions', 'settings', 'playground'] as const
+/** Screen ids in carousel order (defined in a pure module so help content can import them). */
+export { MINI_SCREEN_IDS, type MiniScreenId } from './screen-ids'
 
 export interface MiniScreensInput {
   config: AppConfig
@@ -44,7 +46,7 @@ function LoadingAccount(): React.JSX.Element {
   )
 }
 
-/** Builds the mini carousel screens: Gauges → Sessions → Settings → Playground. */
+/** Builds the mini carousel screens: Gauges → Sessions → Settings → Help → Playground. */
 export function miniScreens({ config, snapshot, onConfigChange }: MiniScreensInput): MiniScreen[] {
   const { widgets } = config
   return [
@@ -78,6 +80,11 @@ export function miniScreens({ config, snapshot, onConfigChange }: MiniScreensInp
       render: () => <SettingsPanel config={config} onChange={onConfigChange} compact />
     },
     {
+      id: 'help',
+      label: 'Help',
+      render: () => <HelpPanel compact />
+    },
+    {
       id: 'playground',
       label: 'Playground',
       miniOnly: true,
@@ -91,6 +98,51 @@ export function screensForMode(screens: readonly MiniScreen[], mode: AppConfig['
   return mode === 'mini' ? [...screens] : screens.filter((screen) => !screen.miniOnly)
 }
 
+export interface MiniDragStripProps {
+  /** Account label to show; omitted when no account is active. */
+  accountLabel?: string | null
+  helpOpen: boolean
+  onToggleHelp: () => void
+}
+
+/**
+ * The drag strip: account label plus a "?" button that opens Help in every mini state
+ * (including error and no-account). Buttons opt out of dragging via the existing CSS rule.
+ */
+export function MiniDragStrip({
+  accountLabel: label,
+  helpOpen,
+  onToggleHelp
+}: MiniDragStripProps): React.JSX.Element {
+  return (
+    <div className="mini-drag-strip">
+      {label && (
+        <span className="mini-account-label" title={label}>
+          {label}
+        </span>
+      )}
+      <button
+        type="button"
+        className="button mini-help-button"
+        aria-label="Help"
+        aria-expanded={helpOpen}
+        onClick={onToggleHelp}
+      >
+        ?
+      </button>
+    </div>
+  )
+}
+
+/** What `mini-main` shows: the compact Help panel while it is open, otherwise the normal content. */
+export function miniMainContent(
+  helpOpen: boolean,
+  onCloseHelp: () => void,
+  content: React.ReactNode
+): React.ReactNode {
+  return helpOpen ? <HelpPanel compact onClose={onCloseHelp} /> : content
+}
+
 export interface MiniAppProps {
   store?: GaugesStore
 }
@@ -102,6 +154,9 @@ export function MiniApp({ store = getGaugesStore() }: MiniAppProps): React.JSX.E
   const config = useGauges((s) => s.config, store)
   const activeAccount: Account | null = useGauges(selectActiveAccount, store)
   const activeSnapshot = useGauges(selectActiveSnapshot, store)
+  const [helpOpen, setHelpOpen] = useState(false)
+  // Remembered so closing Help remounts the carousel on the screen the user left.
+  const [carouselIndex, setCarouselIndex] = useState(0)
 
   const onConfigChange = (patch: Partial<AppConfig>): void => void store.setConfig(patch)
   // Without the Settings screen the user still needs a way back to the max window.
@@ -133,19 +188,24 @@ export function MiniApp({ store = getGaugesStore() }: MiniAppProps): React.JSX.E
     )
   } else {
     const screens = miniScreens({ config, snapshot: activeSnapshot, onConfigChange })
-    content = <Carousel screens={screensForMode(screens, 'mini')} label="Mini screens" />
+    content = (
+      <Carousel
+        screens={screensForMode(screens, 'mini')}
+        label="Mini screens"
+        initialIndex={carouselIndex}
+        onIndexChange={setCarouselIndex}
+      />
+    )
   }
 
   return (
     <div className="app mini">
-      <div className="mini-drag-strip">
-        {activeAccount && (
-          <span className="mini-account-label" title={accountLabel(activeAccount, activeSnapshot)}>
-            {accountLabel(activeAccount, activeSnapshot)}
-          </span>
-        )}
-      </div>
-      <main className="mini-main">{content}</main>
+      <MiniDragStrip
+        accountLabel={activeAccount ? accountLabel(activeAccount, activeSnapshot) : null}
+        helpOpen={helpOpen}
+        onToggleHelp={() => setHelpOpen((open) => !open)}
+      />
+      <main className="mini-main">{miniMainContent(helpOpen, () => setHelpOpen(false), content)}</main>
     </div>
   )
 }

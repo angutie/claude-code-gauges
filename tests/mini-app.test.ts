@@ -1,11 +1,19 @@
-import { createElement, isValidElement, type ReactElement } from 'react'
+import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { AccountSnapshot, AppConfig, SessionInfo } from '../src/shared/types'
 import App from '../src/renderer/App'
 import { createEmptyConfig, createFallbackApi } from '../src/renderer/api'
 import type { SettingsPanelProps } from '../src/renderer/components/SettingsPanel'
-import { MINI_SCREEN_IDS, MiniApp, miniScreens, screensForMode } from '../src/renderer/mini/MiniApp'
+import type { HelpPanelProps } from '../src/renderer/components/HelpPanel'
+import {
+  MINI_SCREEN_IDS,
+  MiniApp,
+  MiniDragStrip,
+  miniMainContent,
+  miniScreens,
+  screensForMode
+} from '../src/renderer/mini/MiniApp'
 import { createGaugesStore, type GaugesStore } from '../src/renderer/store'
 
 function makeConfig(patch: Partial<AppConfig> = {}): AppConfig {
@@ -81,10 +89,11 @@ function renderScreen(node: React.ReactNode): string {
 const noop = (): void => {}
 
 describe('miniScreens', () => {
-  it('orders screens Gauges → Sessions → Settings → Playground', () => {
+  it('orders screens Gauges → Sessions → Settings → Help → Playground', () => {
     const screens = miniScreens({ config: makeConfig(), snapshot: makeSnapshot(), onConfigChange: noop })
     expect(screens.map((s) => s.id)).toEqual([...MINI_SCREEN_IDS])
-    expect(screens.map((s) => s.label)).toEqual(['Gauges', 'Sessions', 'Settings', 'Playground'])
+    expect([...MINI_SCREEN_IDS]).toEqual(['gauges', 'sessions', 'settings', 'help', 'playground'])
+    expect(screens.map((s) => s.label)).toEqual(['Gauges', 'Sessions', 'Settings', 'Help', 'Playground'])
     expect(screens.filter((s) => s.miniOnly).map((s) => s.id)).toEqual(['playground'])
   })
 
@@ -96,12 +105,17 @@ describe('miniScreens', () => {
 
   it('renders compact content for each screen', () => {
     const screens = miniScreens({ config: makeConfig(), snapshot: makeSnapshot(), onConfigChange: noop })
-    const [gauges, sessions, settings, playground] = screens.map((s) => renderScreen(s.render()))
+    const [gauges, sessions, settings, help, playground] = screens.map((s) =>
+      renderScreen(s.render())
+    )
     expect(gauges).toContain('usage-panel--compact')
     expect(sessions).toContain('session-list--compact')
     expect(sessions).toContain('gauges')
     expect(settings).toContain('settings-panel--compact')
     expect(settings).not.toContain('Done')
+    expect(help).toContain('help-panel--compact')
+    expect(help).toContain('aria-label="Help"')
+    expect(help).not.toContain('Done')
     expect(playground).toContain('playground-canvas')
   })
 
@@ -143,19 +157,19 @@ describe('miniScreens', () => {
 })
 
 describe('MiniApp', () => {
-  it('renders the drag strip, account label and carousel with four screens in order', async () => {
+  it('renders the drag strip, account label and carousel with five screens in order', async () => {
     const store = await readyStore(makeConfig())
     const html = renderToStaticMarkup(createElement(MiniApp, { store }))
     expect(html).toContain('mini-drag-strip')
     expect(html).toContain('mini-account-label')
     expect(html).toContain('me@example.com')
     expect(html).toContain('aria-roledescription="carousel"')
-    const order = ['Gauges', 'Sessions', 'Settings', 'Playground'].map((label) =>
+    const order = ['Gauges', 'Sessions', 'Settings', 'Help', 'Playground'].map((label) =>
       html.indexOf(`aria-label="Show ${label}"`)
     )
     expect(order.every((i) => i >= 0)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
-    expect(html).toContain('Gauges (1 of 4)')
+    expect(html).toContain('Gauges (1 of 5)')
   })
 
   it('shows a loading message before init', () => {
@@ -183,6 +197,69 @@ describe('MiniApp', () => {
     const html = renderToStaticMarkup(createElement(MiniApp, { store }))
     expect(html).toContain('Could not load data: boom')
     expect(html).toContain('state-message--error')
+  })
+})
+
+function helpButtonMarkup(html: string): string | undefined {
+  return html.match(/<button[^>]*aria-label="Help"[^>]*>\?<\/button>/)?.[0]
+}
+
+describe('mini "?" help button', () => {
+  async function errorStore(): Promise<GaugesStore> {
+    const api = createFallbackApi(makeConfig())
+    api.getConfig = async () => {
+      throw new Error('boom')
+    }
+    const store = createGaugesStore(api)
+    await store.init()
+    return store
+  }
+
+  it.each([
+    ['ready', () => readyStore(makeConfig())],
+    ['error', errorStore],
+    ['no-account', () => readyStore(makeConfig({ accounts: [], activeAccountId: null }), [])]
+  ])('renders a collapsed "?" button in the drag strip in the %s state', async (_name, make) => {
+    const html = renderToStaticMarkup(createElement(MiniApp, { store: await make() }))
+    const strip = html.slice(html.indexOf('mini-drag-strip'), html.indexOf('mini-main'))
+    const button = helpButtonMarkup(strip)
+    expect(button).toBeDefined()
+    expect(button).toContain('aria-expanded="false"')
+    expect(html).not.toContain('help-panel--compact')
+  })
+
+  it('toggles help from the drag strip button', () => {
+    let toggles = 0
+    const strip = MiniDragStrip({ accountLabel: null, helpOpen: false, onToggleHelp: () => toggles++ })
+    const findButton = (node: ReactNode): ReactElement<{ onClick: () => void }> | undefined => {
+      if (Array.isArray(node)) return node.map(findButton).find(Boolean)
+      if (!isValidElement(node)) return undefined
+      if (node.type === 'button') return node as ReactElement<{ onClick: () => void }>
+      return findButton((node.props as { children?: ReactNode }).children)
+    }
+    const button = findButton(strip)
+    expect(button).toBeDefined()
+    button?.props.onClick()
+    expect(toggles).toBe(1)
+    const open = renderToStaticMarkup(
+      createElement(MiniDragStrip, { accountLabel: 'me', helpOpen: true, onToggleHelp: noop })
+    )
+    expect(helpButtonMarkup(open)).toContain('aria-expanded="true"')
+    expect(open).toContain('mini-account-label')
+  })
+
+  it('swaps mini-main content for the compact HelpPanel and closes back to it', () => {
+    const previous = createElement('p', null, 'previous view')
+    let closed = 0
+    const help = miniMainContent(true, () => closed++, previous)
+    expect(isValidElement(help)).toBe(true)
+    const html = renderScreen(help)
+    expect(html).toContain('help-panel--compact')
+    expect(html).toContain('Done')
+    expect(html).not.toContain('previous view')
+    ;(help as ReactElement<HelpPanelProps>).props.onClose?.()
+    expect(closed).toBe(1)
+    expect(miniMainContent(false, noop, previous)).toBe(previous)
   })
 })
 

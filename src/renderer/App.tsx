@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { WIDGET_KEYS, type AccountSnapshot, type WatchedSessions, type WidgetToggles } from '../shared/types'
 import { AccountTabs } from './components/AccountTabs'
+import { HelpPanel } from './components/HelpPanel'
 import { SessionList } from './components/SessionList'
 import { SessionPicker } from './components/SessionPicker'
 import { SettingsPanel } from './components/SettingsPanel'
@@ -20,6 +21,51 @@ const DEFAULT_WIDGETS = Object.fromEntries(WIDGET_KEYS.map((key) => [key, true])
 
 interface AppProps {
   store?: GaugesStore
+}
+
+/** The panel shown above the content. Settings and Help are mutually exclusive. */
+export type HeaderPanel = 'settings' | 'help' | null
+
+/** Closes `panel` if it is already open; otherwise opens it in place of whichever panel was open. */
+export function toggleHeaderPanel(current: HeaderPanel, panel: Exclude<HeaderPanel, null>): HeaderPanel {
+  return current === panel ? null : panel
+}
+
+export interface AppHeaderProps {
+  openPanel: HeaderPanel
+  /** Settings needs a loaded config, so its button shows only when this is true. Help always shows. */
+  showSettings: boolean
+  onToggle: (panel: Exclude<HeaderPanel, null>) => void
+}
+
+export function AppHeader({ openPanel, showSettings, onToggle }: AppHeaderProps): React.JSX.Element {
+  return (
+    <header className="app-header">
+      <h1 className="app-title">
+        <span className="app-title-accent">Claude Code</span> Gauges
+      </h1>
+      <div className="app-header-actions">
+        <button
+          type="button"
+          className="button"
+          aria-expanded={openPanel === 'help'}
+          onClick={() => onToggle('help')}
+        >
+          Help
+        </button>
+        {showSettings && (
+          <button
+            type="button"
+            className="button"
+            aria-expanded={openPanel === 'settings'}
+            onClick={() => onToggle('settings')}
+          >
+            Settings
+          </button>
+        )}
+      </div>
+    </header>
+  )
 }
 
 function AccountPanel({
@@ -59,7 +105,8 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
   const snapshots = useGauges((s) => s.snapshots, store)
   const activeAccount = useGauges(selectActiveAccount, store)
   const activeSnapshot = useGauges(selectActiveSnapshot, store)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [openPanel, setOpenPanel] = useState<HeaderPanel>(null)
+  const closePanel = (): void => setOpenPanel(null)
 
   useEffect(() => {
     void store.init()
@@ -98,21 +145,11 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1 className="app-title">
-          <span className="app-title-accent">Claude Code</span> Gauges
-        </h1>
-        {status === 'ready' && config && (
-          <button
-            type="button"
-            className="button"
-            aria-expanded={settingsOpen}
-            onClick={() => setSettingsOpen((open) => !open)}
-          >
-            Settings
-          </button>
-        )}
-      </header>
+      <AppHeader
+        openPanel={openPanel}
+        showSettings={status === 'ready' && config !== null}
+        onToggle={(panel) => setOpenPanel((current) => toggleHeaderPanel(current, panel))}
+      />
       {status === 'ready' && (
         <AccountTabs
           accounts={config?.accounts ?? []}
@@ -126,13 +163,14 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
         />
       )}
       <main className="app-main">
-        {settingsOpen && status === 'ready' && config && (
+        {openPanel === 'settings' && status === 'ready' && config && (
           <SettingsPanel
             config={config}
             onChange={(patch) => void store.setConfig(patch)}
-            onClose={() => setSettingsOpen(false)}
+            onClose={closePanel}
           />
         )}
+        {openPanel === 'help' && <HelpPanel onClose={closePanel} />}
         {content}
       </main>
     </div>
