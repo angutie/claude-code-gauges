@@ -189,7 +189,9 @@ export class GaugesController {
   }
 
   /** Persists window bounds without broadcasting (the renderer does not care). */
-  async saveWindowState(patch: Pick<Partial<AppConfig>, 'windowBounds' | 'alwaysOnTop'>): Promise<void> {
+  async saveWindowState(
+    patch: Pick<Partial<AppConfig>, 'windowBounds' | 'miniWindowBounds' | 'alwaysOnTop'>
+  ): Promise<void> {
     this.config = await this.options.store.update(patch)
   }
 
