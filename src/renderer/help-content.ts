@@ -497,6 +497,11 @@ export const MINI_SCREEN_DESCRIPTIONS: Readonly<
     description:
       'The same settings as the max window in a compact two-column layout, including the min / max toggle.'
   },
+  help: {
+    label: 'Help',
+    description:
+      'This help, condensed: pick a topic, then page through short cards with ‹ / ›. Back returns to the topic list.'
+  },
   playground: {
     label: 'Playground',
     description: 'The pet playground. It exists only in the mini window.'

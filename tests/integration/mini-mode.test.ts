@@ -206,7 +206,7 @@ describe('MiniApp with fallback API data', () => {
     expect(html).not.toContain('playground-canvas')
   })
 
-  it("renders all four screens' content in order from fixture data", () => {
+  it("renders all five screens' content in order from fixture data", () => {
     const config = makeConfig()
     const screens = screensForMode(
       miniScreens({ config, snapshot: makeSnapshot(), onConfigChange: () => undefined }),
@@ -214,7 +214,7 @@ describe('MiniApp with fallback API data', () => {
     )
     expect(screens.map((s) => s.id)).toEqual([...MINI_SCREEN_IDS])
 
-    const [gauges, sessions, settings, playground] = screens.map((s) => render(s.render()))
+    const [gauges, sessions, settings, help, playground] = screens.map((s) => render(s.render()))
     expect(gauges).toContain('Session (5h)')
     expect(gauges).toContain('42')
     expect(sessions).toContain('alpha-repo')
@@ -222,6 +222,7 @@ describe('MiniApp with fallback API data', () => {
     expect(settings).toContain('min')
     expect(settings).toContain('max')
     expect(settings).toMatch(/aria-pressed="true"/)
+    expect(help).toContain('help-panel--compact')
     expect(playground).toContain('playground-canvas')
     expect(playground).not.toContain('no busy sessions')
 
@@ -242,7 +243,7 @@ describe('MiniApp with fallback API data', () => {
     const slots = carouselSlots(last, screens)
     expect(slots.find((s) => s.role === 'current')!.screen.id).toBe('playground')
     expect(slots.find((s) => s.role === 'next')!.screen.id).toBe('gauges')
-    expect(slots.find((s) => s.role === 'prev')!.screen.id).toBe('settings')
+    expect(slots.find((s) => s.role === 'prev')!.screen.id).toBe('help')
   })
 
   it('switching to max from the mini settings flows through the store and fallback API', async () => {
@@ -269,6 +270,6 @@ describe('spawn-rate wiring to session data', () => {
       snapshot: makeSnapshot(idleOnly),
       onConfigChange: () => undefined
     })
-    expect(render(idleScreens[3]!.render())).toContain('no busy sessions')
+    expect(render(idleScreens.find((s) => s.id === 'playground')!.render())).toContain('no busy sessions')
   })
 })

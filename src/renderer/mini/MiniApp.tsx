@@ -1,4 +1,5 @@
 import type { Account, AccountSnapshot, AppConfig } from '../../shared/types'
+import { HelpPanel } from '../components/HelpPanel'
 import { SessionList } from '../components/SessionList'
 import { SettingsPanel, WindowModeToggle } from '../components/SettingsPanel'
 import { StateMessage } from '../components/StateMessage'
@@ -44,7 +45,7 @@ function LoadingAccount(): React.JSX.Element {
   )
 }
 
-/** Builds the mini carousel screens: Gauges → Sessions → Settings → Playground. */
+/** Builds the mini carousel screens: Gauges → Sessions → Settings → Help → Playground. */
 export function miniScreens({ config, snapshot, onConfigChange }: MiniScreensInput): MiniScreen[] {
   const { widgets } = config
   return [
@@ -76,6 +77,11 @@ export function miniScreens({ config, snapshot, onConfigChange }: MiniScreensInp
       id: 'settings',
       label: 'Settings',
       render: () => <SettingsPanel config={config} onChange={onConfigChange} compact />
+    },
+    {
+      id: 'help',
+      label: 'Help',
+      render: () => <HelpPanel compact />
     },
     {
       id: 'playground',

@@ -81,10 +81,11 @@ function renderScreen(node: React.ReactNode): string {
 const noop = (): void => {}
 
 describe('miniScreens', () => {
-  it('orders screens Gauges → Sessions → Settings → Playground', () => {
+  it('orders screens Gauges → Sessions → Settings → Help → Playground', () => {
     const screens = miniScreens({ config: makeConfig(), snapshot: makeSnapshot(), onConfigChange: noop })
     expect(screens.map((s) => s.id)).toEqual([...MINI_SCREEN_IDS])
-    expect(screens.map((s) => s.label)).toEqual(['Gauges', 'Sessions', 'Settings', 'Playground'])
+    expect([...MINI_SCREEN_IDS]).toEqual(['gauges', 'sessions', 'settings', 'help', 'playground'])
+    expect(screens.map((s) => s.label)).toEqual(['Gauges', 'Sessions', 'Settings', 'Help', 'Playground'])
     expect(screens.filter((s) => s.miniOnly).map((s) => s.id)).toEqual(['playground'])
   })
 
@@ -96,12 +97,17 @@ describe('miniScreens', () => {
 
   it('renders compact content for each screen', () => {
     const screens = miniScreens({ config: makeConfig(), snapshot: makeSnapshot(), onConfigChange: noop })
-    const [gauges, sessions, settings, playground] = screens.map((s) => renderScreen(s.render()))
+    const [gauges, sessions, settings, help, playground] = screens.map((s) =>
+      renderScreen(s.render())
+    )
     expect(gauges).toContain('usage-panel--compact')
     expect(sessions).toContain('session-list--compact')
     expect(sessions).toContain('gauges')
     expect(settings).toContain('settings-panel--compact')
     expect(settings).not.toContain('Done')
+    expect(help).toContain('help-panel--compact')
+    expect(help).toContain('aria-label="Help"')
+    expect(help).not.toContain('Done')
     expect(playground).toContain('playground-canvas')
   })
 
@@ -143,19 +149,19 @@ describe('miniScreens', () => {
 })
 
 describe('MiniApp', () => {
-  it('renders the drag strip, account label and carousel with four screens in order', async () => {
+  it('renders the drag strip, account label and carousel with five screens in order', async () => {
     const store = await readyStore(makeConfig())
     const html = renderToStaticMarkup(createElement(MiniApp, { store }))
     expect(html).toContain('mini-drag-strip')
     expect(html).toContain('mini-account-label')
     expect(html).toContain('me@example.com')
     expect(html).toContain('aria-roledescription="carousel"')
-    const order = ['Gauges', 'Sessions', 'Settings', 'Playground'].map((label) =>
+    const order = ['Gauges', 'Sessions', 'Settings', 'Help', 'Playground'].map((label) =>
       html.indexOf(`aria-label="Show ${label}"`)
     )
     expect(order.every((i) => i >= 0)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
-    expect(html).toContain('Gauges (1 of 4)')
+    expect(html).toContain('Gauges (1 of 5)')
   })
 
   it('shows a loading message before init', () => {
