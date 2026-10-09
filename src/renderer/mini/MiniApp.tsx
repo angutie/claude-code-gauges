@@ -26,8 +26,8 @@ export interface MiniScreen extends CarouselScreen {
   miniOnly?: boolean
 }
 
-/** Screen ids in carousel order. */
-export const MINI_SCREEN_IDS = ['gauges', 'sessions', 'settings', 'playground'] as const
+/** Screen ids in carousel order (defined in a pure module so help content can import them). */
+export { MINI_SCREEN_IDS, type MiniScreenId } from './screen-ids'
 
 export interface MiniScreensInput {
   config: AppConfig

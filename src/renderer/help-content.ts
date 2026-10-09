@@ -14,6 +14,8 @@ import type {
 import { createEmptyConfig } from './api'
 import { USAGE_THRESHOLDS } from './theme'
 import { MAX_FOLDERS } from './mini/playground-sim'
+import { DEFAULT_WHEEL_OPTIONS } from './mini/carousel-logic'
+import { MINI_SCREEN_IDS, type MiniScreenId } from './mini/screen-ids'
 import {
   BASE_SPAWN_INTERVAL_MS,
   DEFAULT_EFFORT_WEIGHT,
@@ -476,10 +478,203 @@ export const FEATURES_TOPIC: HelpTopic = {
   ]
 }
 
+/** Label and summary for each mini carousel screen; a Record so a new screen must be documented. */
+export const MINI_SCREEN_DESCRIPTIONS: Readonly<
+  Record<MiniScreenId, { readonly label: string; readonly description: string }>
+> = {
+  gauges: {
+    label: 'Gauges',
+    description:
+      '5h and weekly gauges with reset times, plus a one-line notice when data is stale, expired or failed to load.'
+  },
+  sessions: {
+    label: 'Sessions',
+    description:
+      'One line per session (repo · status · model · effort); sessions that do not fit are summarized as “+N more”.'
+  },
+  settings: {
+    label: 'Settings',
+    description:
+      'The same settings as the max window in a compact two-column layout, including the min / max toggle.'
+  },
+  playground: {
+    label: 'Playground',
+    description: 'The pet playground. It exists only in the mini window.'
+  }
+}
+
+const MINI_LABEL = windowModeLabel('mini')
+const MAX_LABEL = windowModeLabel('max')
+const MINI_SCREEN_ORDER = MINI_SCREEN_IDS.map((id) => MINI_SCREEN_DESCRIPTIONS[id].label).join(
+  ' → '
+)
+
+export const MODES_TOPIC: HelpTopic = {
+  id: 'modes',
+  title: `Mini vs max (${MINI_LABEL} / ${MAX_LABEL})`,
+  sections: [
+    {
+      id: 'window-modes',
+      title: 'The two window sizes',
+      relatedSettings: ['windowMode'],
+      paragraphs: [
+        [
+          'The app runs in one of two window sizes. Both show the same data for the selected account; they differ in layout and in what you can do.'
+        ]
+      ],
+      entries: WINDOW_MODE_OPTIONS.map(({ mode, label, glyph }) => ({
+        id: mode,
+        term: `${glyph} ${label}`,
+        body:
+          mode === 'max'
+            ? [
+                [
+                  'The full, resizable window. It is the only place to add, remove and switch accounts (account tabs) and to choose sessions with the session picker.'
+                ],
+                [
+                  'Settings open as a full panel with a Done button. Content that does not fit scrolls.'
+                ]
+              ]
+            : [
+                [
+                  'A small square (1:1) window showing one condensed screen at a time. The strip at the top shows the active account and is used to drag the window; to change accounts, switch back to max.'
+                ],
+                [
+                  'Settings use a compact two-column layout. Text scales with the window size and nothing scrolls.'
+                ]
+              ]
+      }))
+    },
+    {
+      id: 'switching',
+      title: 'Switching between them',
+      relatedSettings: ['windowMode'],
+      paragraphs: [
+        [
+          `To shrink: open Settings in the max window and choose ${MINI_LABEL} under Window. To grow: go to the Settings screen in the mini carousel and choose ${MAX_LABEL}. If the mini window shows an error or “no accounts” message, the same ${MINI_LABEL} / ${MAX_LABEL} toggle appears in that message.`
+        ],
+        [
+          'Each size remembers its own position and dimensions (saved as ',
+          code('windowBounds'),
+          ' for max and ',
+          code('miniWindowBounds'),
+          ' for mini), so switching puts the window back where that size was last used. The app reopens in the size you used last.'
+        ]
+      ]
+    },
+    {
+      id: 'carousel',
+      title: 'Mini screens',
+      paragraphs: [
+        [`Screens come in this order and loop around: ${MINI_SCREEN_ORDER}.`],
+        [
+          `Swipe sideways on a trackpad, or hold Shift and turn the mouse wheel. Each gesture moves exactly one screen: it must pass ${DEFAULT_WHEEL_OPTIONS.threshold} px, then waits ${DEFAULT_WHEEL_OPTIONS.cooldownMs} ms before the next move.`
+        ],
+        [
+          'When the carousel has focus, ← and → move one screen (ignored while typing in a text field). Click a dot at the bottom to jump to a screen.'
+        ]
+      ],
+      entries: MINI_SCREEN_IDS.map((id) => ({
+        id,
+        term: MINI_SCREEN_DESCRIPTIONS[id].label,
+        body: [[MINI_SCREEN_DESCRIPTIONS[id].description]]
+      }))
+    }
+  ]
+}
+
+export const GLOSSARY_TOPIC: HelpTopic = {
+  id: 'glossary',
+  title: 'Glossary',
+  sections: [
+    {
+      id: 'terms',
+      title: 'Terms',
+      paragraphs: [],
+      entries: [
+        {
+          id: 'session',
+          term: 'Session',
+          body: [
+            [
+              'One running Claude Code instance (one ',
+              code('claude'),
+              ' process) in a working folder. Each account can have several at once.'
+            ]
+          ]
+        },
+        {
+          id: 'config-dir',
+          term: 'Config dir',
+          body: [
+            [
+              'The folder where Claude Code keeps an account’s login and sessions: ',
+              code('~/.claude'),
+              ' by default, or the folder set with ',
+              code('CLAUDE_CONFIG_DIR'),
+              '. Each linked account is one config dir.'
+            ]
+          ]
+        },
+        {
+          id: 'effort',
+          term: 'Effort',
+          body: [
+            [
+              `How hard Claude reasons on each turn: ${EFFORT_LEVELS.join(', ')}. Higher effort uses more of your limits.`
+            ]
+          ]
+        },
+        {
+          id: '5h-window',
+          term: '5h window',
+          body: [
+            [
+              'A rolling 5-hour usage limit. It starts with your first message and resets 5 hours later; the Session (5h) gauge shows how much of it is used.'
+            ]
+          ]
+        },
+        {
+          id: 'weekly-window',
+          term: 'Weekly window',
+          body: [
+            [
+              'A 7-day usage limit across all sessions of the account, shown by the Weekly gauge. Some plans also report separate Opus and Sonnet weekly limits.'
+            ]
+          ]
+        },
+        {
+          id: 'stale',
+          term: 'Stale',
+          body: [[USAGE_STATUS_DESCRIPTIONS.stale]]
+        },
+        {
+          id: 'expired',
+          term: 'Expired',
+          body: [[USAGE_STATUS_DESCRIPTIONS.expired]]
+        }
+      ]
+    }
+  ]
+}
+
+/** Glossary entry ids, for completeness checks. */
+export const GLOSSARY_TERM_IDS = [
+  'session',
+  'config-dir',
+  'effort',
+  '5h-window',
+  'weekly-window',
+  'stale',
+  'expired'
+] as const
+
 export const HELP_TOPICS: readonly HelpTopic[] = [
   GETTING_STARTED_TOPIC,
   SETTINGS_TOPIC,
-  FEATURES_TOPIC
+  FEATURES_TOPIC,
+  MODES_TOPIC,
+  GLOSSARY_TOPIC
 ]
 
 export function getHelpTopics(): readonly HelpTopic[] {

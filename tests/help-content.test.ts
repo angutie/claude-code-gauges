@@ -17,9 +17,15 @@ import {
   MAX_SPAWN_INTERVAL_MS,
   MIN_SPAWN_INTERVAL_MS
 } from '../src/renderer/mini/spawn-rate'
+import { DEFAULT_WHEEL_OPTIONS } from '../src/renderer/mini/carousel-logic'
+import { MINI_SCREEN_IDS, miniScreens, type MiniScreenId } from '../src/renderer/mini/MiniApp'
 import {
   EFFORT_LEVELS,
   FEATURES_TOPIC,
+  GLOSSARY_TERM_IDS,
+  GLOSSARY_TOPIC,
+  MINI_SCREEN_DESCRIPTIONS,
+  MODES_TOPIC,
   findHelpTopic,
   getHelpTopics,
   HELP_TOPICS,
@@ -246,5 +252,101 @@ describe('features topic', () => {
   it('describes the playground as mini-only', () => {
     expect(section('playground').title).toMatch(/mini only/i)
     expect(sectionText('playground')).toMatch(/only in the mini window/)
+  })
+})
+
+describe('modes topic', () => {
+  const topic = findHelpTopic('modes')!
+  const section = (id: string) => topic.sections.find((s) => s.id === id)!
+  const sectionText = (id: string) =>
+    topicText({ id: topic.id, title: topic.title, sections: [section(id)] })
+
+  it('exists with window-modes, switching and carousel sections', () => {
+    expect(topic).toBe(MODES_TOPIC)
+    expect(topic.sections.map((s) => s.id)).toEqual(['window-modes', 'switching', 'carousel'])
+  })
+
+  it('documents both window modes by their toggle labels', () => {
+    const entries = section('window-modes').entries ?? []
+    expect(entries.map((e) => e.id)).toEqual(WINDOW_MODE_OPTIONS.map((o) => o.mode))
+    for (const { mode, label } of WINDOW_MODE_OPTIONS) {
+      expect(entries.find((e) => e.id === mode)!.term).toContain(label)
+    }
+    for (const id of section('window-modes').relatedSettings ?? []) {
+      expect(SETTINGS_ENTRY_IDS).toContain(id)
+    }
+  })
+
+  it('documents every mini screen in carousel order', () => {
+    expect(Object.keys(MINI_SCREEN_DESCRIPTIONS).sort()).toEqual([...MINI_SCREEN_IDS].sort())
+    const entries = section('carousel').entries ?? []
+    expect(entries.map((e) => e.id)).toEqual([...MINI_SCREEN_IDS])
+    const order = MINI_SCREEN_IDS.map((id) => MINI_SCREEN_DESCRIPTIONS[id].label).join(' → ')
+    expect(sectionText('carousel')).toContain(order)
+  })
+
+  it('uses the same screen labels as the mini carousel', () => {
+    const screens = miniScreens({
+      config: createEmptyConfig(),
+      snapshot: null,
+      onConfigChange: () => undefined
+    })
+    for (const screen of screens) {
+      expect(MINI_SCREEN_DESCRIPTIONS[screen.id as MiniScreenId].label).toBe(screen.label)
+    }
+  })
+
+  it('derives carousel wheel numbers from DEFAULT_WHEEL_OPTIONS', () => {
+    const text = sectionText('carousel')
+    expect(text).toContain(`${DEFAULT_WHEEL_OPTIONS.threshold} px`)
+    expect(text).toContain(`${DEFAULT_WHEEL_OPTIONS.cooldownMs} ms`)
+    expect(text).toMatch(/←/)
+    expect(text).toMatch(/Shift/)
+  })
+
+  it('explains switching and per-mode window bounds', () => {
+    const text = sectionText('switching')
+    expect(text).toContain('windowBounds')
+    expect(text).toContain('miniWindowBounds')
+    for (const { label } of WINDOW_MODE_OPTIONS) expect(text).toContain(label)
+  })
+
+  it('keeps account switching max-only and states mini does not scroll', () => {
+    const entries = section('window-modes').entries ?? []
+    const mini = entries.find((e) => e.id === 'mini')!.body.map(paragraphText).join(' ')
+    const max = entries.find((e) => e.id === 'max')!.body.map(paragraphText).join(' ')
+    expect(max).toMatch(/switch accounts/)
+    expect(mini).toMatch(/switch back to max/)
+    expect(mini).not.toMatch(/(?<!to )(switch|select|change) (between )?accounts? (here|in mini)/i)
+    expect(mini).toMatch(/nothing scrolls/)
+    expect(mini).toMatch(/compact/)
+  })
+})
+
+describe('glossary topic', () => {
+  const topic = findHelpTopic('glossary')!
+
+  it('defines every listed term once', () => {
+    expect(topic).toBe(GLOSSARY_TOPIC)
+    const ids = topic.sections.flatMap((s) => (s.entries ?? []).map((e) => e.id))
+    expect(ids).toEqual([...GLOSSARY_TERM_IDS])
+    expect([...GLOSSARY_TERM_IDS].sort()).toEqual(
+      ['5h-window', 'config-dir', 'effort', 'expired', 'session', 'stale', 'weekly-window'].sort()
+    )
+    for (const entry of topic.sections.flatMap((s) => s.entries ?? [])) {
+      expect(entry.body.map(paragraphText).join('').length).toBeGreaterThan(0)
+    }
+  })
+
+  it('reuses feature wording for stale/expired and lists every effort level', () => {
+    const text = topicText(topic)
+    expect(text).toContain(USAGE_STATUS_DESCRIPTIONS.stale)
+    expect(text).toContain(USAGE_STATUS_DESCRIPTIONS.expired)
+    expect(text).toContain('CLAUDE_CONFIG_DIR')
+    for (const level of EFFORT_LEVELS) expect(text).toContain(level)
+  })
+
+  it('is the last help topic, after modes', () => {
+    expect(HELP_TOPICS.map((t) => t.id).slice(-2)).toEqual(['modes', 'glossary'])
   })
 })
