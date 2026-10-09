@@ -2,7 +2,12 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { UsageSnapshot } from '../src/shared/types'
-import { UsageGauge, UsagePanel, type UsagePanelProps } from '../src/renderer/components/UsageGauge'
+import {
+  UsageGauge,
+  UsagePanel,
+  compactNotice,
+  type UsagePanelProps
+} from '../src/renderer/components/UsageGauge'
 
 const NOW = 1_790_000_000_000
 const ALL_ON = { usage5h: true, usageWeekly: true }
@@ -105,5 +110,64 @@ describe('UsagePanel', () => {
     expect(html).not.toContain('Session (5h)')
     expect(html).toContain('Weekly')
     expect(render({ widgets: { usage5h: false, usageWeekly: false } })).toBe('')
+  })
+})
+
+describe('UsagePanel compact', () => {
+  const compact = (props: Partial<UsagePanelProps> = {}): string => render({ compact: true, ...props })
+
+  it('renders both 5h and weekly gauges with reset times and no panel heading', () => {
+    const html = compact()
+    expect(html).toContain('usage-panel--compact')
+    expect(html).toContain('Session (5h)')
+    expect(html).toContain('Weekly')
+    expect(html).toContain('resets in 2h 05m')
+    expect(html).toContain('resets in 3d 00h')
+    expect(html).toContain('last updated 12 s ago')
+    expect(html).not.toContain('panel-title')
+    expect(html).not.toContain('usage-notice')
+  })
+
+  it.each([
+    [{ usage: makeUsage({ status: 'expired' }) }, 'Token expired — run claude', 'usage-notice--expired'],
+    [{ tokenStatus: 'expired' as const }, 'Token expired — run claude', 'usage-notice--expired'],
+    [{ usage: makeUsage({ status: 'stale', message: 'Rate limited' }) }, 'Stale data', 'usage-notice--stale'],
+    [{ usage: makeUsage({ status: 'error', message: 'Boom' }) }, 'Usage error', 'usage-notice--error']
+  ])('renders a single short notice line', (props, text, tone) => {
+    const html = compact(props)
+    expect(html.match(/<p /g)).toHaveLength(1)
+    expect(html).toContain('usage-notice--compact')
+    expect(html).toContain(tone)
+    expect(html).toContain(`>${text}</p>`)
+    expect(html).not.toContain('<code>')
+  })
+
+  it('keeps full notice detail in the tooltip', () => {
+    expect(compactNotice(makeUsage({ status: 'stale', message: 'Rate limited' }))).toEqual({
+      text: 'Stale data',
+      title: 'Stale data — Rate limited',
+      tone: 'stale'
+    })
+    expect(compactNotice(makeUsage({ status: 'error', message: 'Boom' }))?.title).toBe('Boom')
+    expect(compactNotice(makeUsage())).toBeNull()
+  })
+
+  it('shows Opus/Sonnet bars without countdowns only when enabled and allowed', () => {
+    const usage = makeUsage({
+      weeklyOpus: { percent: 92, resetsAt: NOW + 86_400_000 },
+      weeklySonnet: { percent: 30, resetsAt: NOW + 86_400_000 }
+    })
+    const html = compact({ usage })
+    expect(html).toContain('Opus')
+    expect(html).toContain('Sonnet')
+    expect(html).toContain('usage-secondary--compact')
+    expect(html.match(/resets in/g)).toHaveLength(2)
+    expect(compact({ usage, showSecondary: false })).not.toContain('Opus')
+    expect(compact({ usage, widgets: { usage5h: true, usageWeekly: false } })).not.toContain('Opus')
+  })
+
+  it('respects widget toggles', () => {
+    expect(compact({ widgets: { usage5h: true, usageWeekly: false } })).not.toContain('Weekly')
+    expect(compact({ widgets: { usage5h: false, usageWeekly: false } })).toBe('')
   })
 })

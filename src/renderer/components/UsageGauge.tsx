@@ -82,6 +82,13 @@ export interface UsagePanelProps {
   tokenStatus?: TokenStatus | null
   /** Fixed time for tests; when omitted the panel ticks every second. */
   now?: EpochMs
+  /**
+   * Condensed layout for the square mini window: no panel heading, single-line notices and
+   * Opus/Sonnet bars without countdowns.
+   */
+  compact?: boolean
+  /** Compact only: lets the host drop the Opus/Sonnet bars when space is tight. Defaults to true. */
+  showSecondary?: boolean
 }
 
 function RefreshHint(): React.JSX.Element {
@@ -113,8 +120,72 @@ function StatusNotice({ usage }: { usage: UsageSnapshot }): React.JSX.Element | 
   }
 }
 
+export type CompactNoticeTone = 'expired' | 'stale' | 'error' | 'muted'
+
+export interface CompactNotice {
+  /** Short single-line text shown in the mini window. */
+  text: string
+  /** Full detail for the tooltip. */
+  title: string
+  tone: CompactNoticeTone
+}
+
+/** Condensed one-line notice for the compact panel, or null when usage is fresh. */
+export function compactNotice(
+  usage: UsageSnapshot,
+  tokenStatus?: TokenStatus | null
+): CompactNotice | null {
+  if (usage.status === 'expired' || tokenStatus === 'expired') {
+    return {
+      text: 'Token expired — run claude',
+      title: 'Token expired — run claude to refresh',
+      tone: 'expired'
+    }
+  }
+  switch (usage.status) {
+    case 'loading':
+      return { text: 'Loading usage…', title: 'Loading usage…', tone: 'muted' }
+    case 'stale':
+      return {
+        text: 'Stale data',
+        title: `Stale data — ${usage.message ?? 'last refresh failed'}`,
+        tone: 'stale'
+      }
+    case 'error':
+      return { text: 'Usage error', title: usage.message ?? 'Usage unavailable', tone: 'error' }
+    case 'unavailable':
+      return {
+        text: 'No credentials',
+        title: usage.message ?? 'No credentials found for this account',
+        tone: 'muted'
+      }
+    default:
+      return null
+  }
+}
+
+function CompactNoticeLine({ notice }: { notice: CompactNotice }): React.JSX.Element {
+  const toneClass = notice.tone === 'muted' ? 'muted' : `usage-notice--${notice.tone}`
+  return (
+    <p
+      className={`usage-notice usage-notice--compact ${toneClass}`}
+      title={notice.title}
+      role={notice.tone === 'expired' ? 'alert' : undefined}
+    >
+      {notice.text}
+    </p>
+  )
+}
+
 /** The "Session (5h)" and "Weekly" gauges plus optional Opus/Sonnet weekly bars. */
-export function UsagePanel({ usage, widgets, tokenStatus, now: fixedNow }: UsagePanelProps): React.JSX.Element | null {
+export function UsagePanel({
+  usage,
+  widgets,
+  tokenStatus,
+  now: fixedNow,
+  compact = false,
+  showSecondary = true
+}: UsagePanelProps): React.JSX.Element | null {
   const tickingNow = useNow()
   const now = fixedNow ?? tickingNow
 
@@ -126,6 +197,44 @@ export function UsagePanel({ usage, widgets, tokenStatus, now: fixedNow }: Usage
     { label: 'Opus', window: usage.weeklyOpus },
     { label: 'Sonnet', window: usage.weeklySonnet }
   ].filter((entry) => entry.window?.percent != null)
+
+  if (compact) {
+    const notice = compactNotice(usage, tokenStatus)
+    const compactSecondary = widgets.usageWeekly && showSecondary ? secondary : []
+    return (
+      <section className="usage-panel usage-panel--compact" aria-label="Usage">
+        {notice && <CompactNoticeLine notice={notice} />}
+        <div className="usage-gauges usage-gauges--compact">
+          {widgets.usage5h && (
+            <UsageGauge label="Session (5h)" window={usage.fiveHour} now={now} stale={stale} />
+          )}
+          {widgets.usageWeekly && (
+            <UsageGauge label="Weekly" window={usage.weekly} now={now} stale={stale} />
+          )}
+          {compactSecondary.length > 0 && (
+            <div className="usage-secondary usage-secondary--compact">
+              {compactSecondary.map((entry) => (
+                <UsageGauge
+                  key={entry.label}
+                  label={entry.label}
+                  window={{ percent: entry.window?.percent ?? null, resetsAt: null }}
+                  now={now}
+                  variant="secondary"
+                  stale={stale}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+        <span
+          className="usage-updated usage-updated--compact muted"
+          title="Time since the last successful usage fetch"
+        >
+          {formatLastUpdated(usage.lastSuccessAt, now)}
+        </span>
+      </section>
+    )
+  }
 
   return (
     <section className="panel usage-panel" aria-label="Usage">

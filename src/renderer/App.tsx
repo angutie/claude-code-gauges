@@ -4,7 +4,9 @@ import { AccountTabs } from './components/AccountTabs'
 import { SessionList } from './components/SessionList'
 import { SessionPicker } from './components/SessionPicker'
 import { SettingsPanel } from './components/SettingsPanel'
+import { StateMessage } from './components/StateMessage'
 import { UsagePanel } from './components/UsageGauge'
+import { MiniApp } from './mini/MiniApp'
 import {
   getGaugesStore,
   selectActiveAccount,
@@ -18,20 +20,6 @@ const DEFAULT_WIDGETS = Object.fromEntries(WIDGET_KEYS.map((key) => [key, true])
 
 interface AppProps {
   store?: GaugesStore
-}
-
-function StateMessage({
-  children,
-  variant
-}: {
-  children: React.ReactNode
-  variant?: 'error'
-}): React.JSX.Element {
-  return (
-    <div className={variant ? `state-message state-message--${variant}` : 'state-message'} role="status">
-      {children}
-    </div>
-  )
 }
 
 function AccountPanel({
@@ -77,6 +65,9 @@ function App({ store = getGaugesStore() }: AppProps): React.JSX.Element {
     void store.init()
     return () => store.dispose()
   }, [store])
+
+  // The mini window has its own shell; the max layout below is unchanged.
+  if (config?.windowMode === 'mini') return <MiniApp store={store} />
 
   let content: React.ReactNode
   if (status === 'loading') {

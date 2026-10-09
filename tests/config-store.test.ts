@@ -51,6 +51,8 @@ describe('defaults', () => {
     expect(config.usagePollSeconds).toBe(90)
     expect(config.alwaysOnTop).toBe(false)
     expect(config.windowBounds).toBeNull()
+    expect(config.windowMode).toBe('max')
+    expect(config.miniWindowBounds).toBeNull()
   })
 })
 
@@ -136,6 +138,43 @@ describe('mergeWithDefaults', () => {
     })
     expect(mergeWithDefaults({ windowBounds: { width: -1, height: 600 } }, defaults).windowBounds).toBeNull()
   })
+
+  it('accepts known window modes and falls back to max otherwise', () => {
+    expect(mergeWithDefaults({ windowMode: 'mini' }, defaults).windowMode).toBe('mini')
+    expect(mergeWithDefaults({ windowMode: 'max' }, defaults).windowMode).toBe('max')
+    for (const windowMode of ['tiny', 'MINI', '', 1, null, true, { mode: 'mini' }]) {
+      expect(mergeWithDefaults({ windowMode }, defaults).windowMode).toBe('max')
+    }
+    expect(mergeWithDefaults({}, defaults).windowMode).toBe('max')
+  })
+
+  it('validates mini window bounds independently of max bounds', () => {
+    const merged = mergeWithDefaults(
+      {
+        windowBounds: { width: 420, height: 640 },
+        miniWindowBounds: { x: 5, y: 6, width: 400, height: 400 }
+      },
+      defaults
+    )
+    expect(merged.windowBounds).toEqual({ width: 420, height: 640 })
+    expect(merged.miniWindowBounds).toEqual({ x: 5, y: 6, width: 400, height: 400 })
+    expect(
+      mergeWithDefaults({ miniWindowBounds: { width: 400, height: 400, x: 'a' } }, defaults)
+        .miniWindowBounds
+    ).toEqual({ width: 400, height: 400 })
+    for (const miniWindowBounds of [
+      { width: 0, height: 400 },
+      { width: 400 },
+      { width: Number.NaN, height: 400 },
+      { width: '400', height: '400' },
+      [400, 400],
+      'big',
+      null
+    ]) {
+      expect(mergeWithDefaults({ miniWindowBounds }, defaults).miniWindowBounds).toBeNull()
+    }
+    expect(mergeWithDefaults({}, defaults).miniWindowBounds).toBeNull()
+  })
 })
 
 describe('saveConfig', () => {
@@ -175,6 +214,31 @@ describe('ConfigStore', () => {
     await Promise.all([60, 90, 120, 150, 180].map((s) => store.update({ usagePollSeconds: s })))
     expect((await loadConfig(dir, noEnv)).usagePollSeconds).toBe(180)
     expect(await readdir(dir)).toEqual([CONFIG_FILE_NAME])
+  })
+
+  it('persists windowMode and miniWindowBounds across reopening', async () => {
+    const store = await ConfigStore.open(dir, noEnv)
+    await store.update({
+      windowMode: 'mini',
+      miniWindowBounds: { x: 30, y: 40, width: 360, height: 360 }
+    })
+    const reopened = await ConfigStore.open(dir, noEnv)
+    expect(reopened.get().windowMode).toBe('mini')
+    expect(reopened.get().miniWindowBounds).toEqual({ x: 30, y: 40, width: 360, height: 360 })
+    expect(reopened.get().windowBounds).toBeNull()
+  })
+
+  it('rejects an invalid windowMode and malformed miniWindowBounds on set', async () => {
+    const store = await ConfigStore.open(dir, noEnv)
+    await store.update({ windowMode: 'mini', miniWindowBounds: { width: 300, height: 300 } })
+    const next = await store.set({
+      ...store.get(),
+      windowMode: 'huge',
+      miniWindowBounds: { width: -5, height: 300 }
+    })
+    expect(next.windowMode).toBe('max')
+    expect(next.miniWindowBounds).toBeNull()
+    expect((await loadConfig(dir, noEnv)).windowMode).toBe('max')
   })
 
   it('returns copies so callers cannot mutate internal state', async () => {

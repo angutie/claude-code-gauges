@@ -40,7 +40,9 @@ export function createEmptyConfig(): AppConfig {
     },
     usagePollSeconds: 90,
     alwaysOnTop: false,
-    windowBounds: null
+    windowBounds: null,
+    windowMode: 'max',
+    miniWindowBounds: null
   }
 }
 

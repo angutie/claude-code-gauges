@@ -4,11 +4,13 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
   WIDGET_KEYS,
+  WINDOW_MODES,
   type Account,
   type AppConfig,
   type WatchedSessions,
   type WidgetToggles,
-  type WindowBounds
+  type WindowBounds,
+  type WindowMode
 } from '../shared/types'
 
 /**
@@ -44,7 +46,9 @@ export function createDefaultConfig(options: DefaultsOptions = {}): AppConfig {
     widgets,
     usagePollSeconds: DEFAULT_USAGE_POLL_SECONDS,
     alwaysOnTop: false,
-    windowBounds: null
+    windowBounds: null,
+    windowMode: 'max',
+    miniWindowBounds: null
   }
 }
 
@@ -109,6 +113,10 @@ function parseWindowBounds(raw: unknown): WindowBounds | null {
   return bounds
 }
 
+function isWindowMode(value: unknown): value is WindowMode {
+  return typeof value === 'string' && (WINDOW_MODES as readonly string[]).includes(value)
+}
+
 /** Merges an untrusted (possibly partial) config object over the defaults. */
 export function mergeWithDefaults(raw: unknown, defaults: AppConfig = createDefaultConfig()): AppConfig {
   if (!isRecord(raw)) return structuredClone(defaults)
@@ -121,6 +129,7 @@ export function mergeWithDefaults(raw: unknown, defaults: AppConfig = createDefa
 
   const rawPoll = raw['usagePollSeconds']
   const rawAlwaysOnTop = raw['alwaysOnTop']
+  const rawWindowMode = raw['windowMode']
 
   return {
     accounts,
@@ -130,7 +139,12 @@ export function mergeWithDefaults(raw: unknown, defaults: AppConfig = createDefa
     usagePollSeconds: isFiniteNumber(rawPoll) ? clampPollSeconds(rawPoll) : defaults.usagePollSeconds,
     alwaysOnTop: typeof rawAlwaysOnTop === 'boolean' ? rawAlwaysOnTop : defaults.alwaysOnTop,
     windowBounds:
-      'windowBounds' in raw ? parseWindowBounds(raw['windowBounds']) : structuredClone(defaults.windowBounds)
+      'windowBounds' in raw ? parseWindowBounds(raw['windowBounds']) : structuredClone(defaults.windowBounds),
+    windowMode: isWindowMode(rawWindowMode) ? rawWindowMode : defaults.windowMode,
+    miniWindowBounds:
+      'miniWindowBounds' in raw
+        ? parseWindowBounds(raw['miniWindowBounds'])
+        : structuredClone(defaults.miniWindowBounds)
   }
 }
 

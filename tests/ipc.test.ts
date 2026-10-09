@@ -239,6 +239,20 @@ describe('GaugesController', () => {
     expect(reopened.get().alwaysOnTop).toBe(true)
   })
 
+  it('persists mini and max window bounds independently without broadcasting', async () => {
+    const controller = createController()
+    await controller.start()
+    sent = []
+    await controller.saveWindowState({ windowBounds: { x: 10, y: 20, width: 420, height: 640 } })
+    await controller.saveWindowState({ miniWindowBounds: { x: 30, y: 40, width: 416, height: 439 } })
+    expect(controller.getConfig().windowBounds).toEqual({ x: 10, y: 20, width: 420, height: 640 })
+    expect(controller.getConfig().miniWindowBounds).toEqual({ x: 30, y: 40, width: 416, height: 439 })
+    expect(sent.some((m) => m.channel === IPC_CHANNELS.configChanged)).toBe(false)
+    const reopened = await ConfigStore.open(dir, DEFAULTS)
+    expect(reopened.get().windowBounds).toEqual({ x: 10, y: 20, width: 420, height: 640 })
+    expect(reopened.get().miniWindowBounds).toEqual({ x: 30, y: 40, width: 416, height: 439 })
+  })
+
   it('disposes all monitors', async () => {
     const controller = createController()
     await controller.start()

@@ -6,6 +6,7 @@ A small desktop window that shows your Claude Code activity as it happens:
 - **Model and effort** for each session (for example `Opus 5.5` · `max`)
 - **Usage gauges**: the **Session (5h)** and **Weekly** limits as percentages with reset countdowns, plus Opus/Sonnet weekly bars when your plan reports them
 - **Multiple accounts**: one tab for each linked Claude Code config directory
+- **Mini mode**: a small square window with a carousel of condensed screens, including a pixel-art Claude pet that eats folders while your sessions work
 
 It is built with Electron, React, and TypeScript, and has been tested on Windows 11.
 
@@ -43,10 +44,66 @@ Packaging into an installer (electron-builder) isn't set up yet. Use `npm run bu
   - Show or hide each widget: sessions, model, effort, 5h gauge, weekly gauge, branch, status
   - Usage poll interval, limited to **60–600 s** (default 90 s)
   - **Always on top**
+  - **Window: min / max**: switch between the full window and the [mini window](#mini-mode)
 - Gauge colors: normal below 70%, warning from 70% to 90%, critical above 90%. When a value can't be fetched the gauge shows `unknown`, a stale marker, or `Token expired, run \`claude\` to refresh`.
 - Usage refreshes on the poll timer and also when the window gains focus.
 
-Settings, linked accounts, and window size and position are saved to `config.json` in Electron's `userData` folder (`%APPDATA%\claude-code-gauges\` on Windows). Writes are atomic. If the file is corrupt, the app starts with the defaults.
+Settings, linked accounts, window mode, and the window size and position for each mode are saved to `config.json` in Electron's `userData` folder (`%APPDATA%\claude-code-gauges\` on Windows). Writes are atomic. If the file is corrupt, the app starts with the defaults.
+
+## Mini mode
+
+Mini mode turns the app into a small square window. It shows one condensed screen at a time, so it can sit in a corner of the screen.
+
+### Entering and leaving mini mode
+
+- **Enter:** open **Settings** and choose **min** (▢) under **Window**.
+- **Leave:** go to the **Settings** screen in the mini carousel and choose **max** (▣). If the mini window shows an error or "no accounts" message instead of the carousel, the same toggle appears in that message.
+
+The setting is saved as `windowMode` (`"max"` by default), so the app reopens in the mode you last used.
+
+### Window size
+
+- The mini window keeps a **1:1 aspect ratio** while you resize it. It opens at **400 × 400** (content size) and can shrink to **260 × 260**.
+- Each mode saves its own size and position: `windowBounds` for max and `miniWindowBounds` for mini. Switching modes puts the window back where that mode was last used. Saved bounds that are off-screen are ignored.
+- The full window keeps its usual limits: it opens at 420 × 640 and can shrink to 320 × 400.
+- Drag the strip at the top of the mini window to move it. The strip also shows the active account's name. To switch accounts, go back to max.
+- Text and gauges scale with the window size, and no mini screen scrolls.
+
+### Carousel navigation
+
+The screens come in this order: **Gauges → Sessions → Settings → Playground**. The carousel loops, so moving forward from Playground goes back to Gauges, and moving back from Gauges goes to Playground.
+
+- **Horizontal scroll:** swipe sideways on a trackpad, or hold **Shift** and turn the mouse wheel. Each gesture moves exactly **one** screen. Wheel movement has to pass a small threshold (60 px) before the screen changes. After that there is a short cooldown (450 ms), so one long swipe can't skip several screens.
+- **Arrow keys:** when the carousel has focus, **←** and **→** move one screen. They are ignored while you are typing in a text field.
+- **Pager dots:** the dots at the bottom show which screen you are on. Click a dot to jump straight to that screen.
+
+Only the current screen is mounted. The playground simulation and the settings form never run twice.
+
+| Screen     | Contents                                                                                     |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| Gauges     | 5h and weekly gauges with reset times (Opus/Sonnet bars if enabled), plus a one-line notice when data is expired, stale, or failed to load |
+| Sessions   | One line per session (repo · status · model · effort). Sessions that don't fit are summarized as `+N more` |
+| Settings   | The same settings as the full window, in a compact two-column layout, including the min / max toggle |
+| Playground | The pet playground (mini mode only)                                                          |
+
+### Pet playground
+
+The **Playground** screen exists **only in mini mode**. The full window never shows it.
+
+- A pixel-art Claude pet (in Claude orange) walks around a pixelated canvas. Folder icons appear at random spots, and the pet heads for the **nearest folder** and eats it when it reaches it. A counter shows how many folders it has eaten. When there are no folders, the pet wanders.
+- At most **12 folders** can be on screen at once. When the cap is reached, no more spawn until the pet eats one.
+- The animation runs only while the Playground screen is showing and the window is visible. It stops when you move to another screen and pauses when the window is hidden. If your OS has **reduced motion** turned on, the pet moves and animates more slowly.
+
+**Spawn rate.** How often folders appear depends on how hard Claude is working:
+
+- Only **active** sessions count. A session is active when its status is **`busy`**, meaning Claude is working on a turn. Idle, waiting (for input or a permission prompt), and unknown sessions don't count.
+- Each active session adds weight based on its effort: `low` = 1, `medium` = 2, `high` = 3, `max` = 4. A missing or unrecognized effort counts as 2.
+- The time between spawns is `12 s ÷ (total weight of busy sessions)`, kept between **1 s and 12 s**.
+- With **no busy sessions, no folders spawn**.
+
+For example, one busy `max` session spawns a folder every 3 s. Two busy `high` sessions plus one busy `low` session (total weight 7) spawn one about every 1.7 s.
+
+The rule is implemented in `folderSpawnIntervalMs` in `src/renderer/mini/spawn-rate.ts`.
 
 ## Linking multiple accounts
 
@@ -114,13 +171,18 @@ Everything is read-only. The app never writes to a Claude Code config directory.
  │                 onSnapshot, onConfigChanged                              │
  └─────────────┼────────────────────────────────────────────────────────────┘
  ┌─────────────▼──────── renderer (React, display only) ────────────────────┐
- │  store ─► App ─► AccountTabs · SessionPicker · SessionList ·             │
- │                  UsageGauge · SettingsPanel                              │
+ │  store ─► App ─┬─ max:  AccountTabs · SessionPicker · SessionList ·      │
+ │                │        UsageGauge · SettingsPanel                       │
+ │                └─ mini: MiniApp ─► Carousel ─► compact UsagePanel ·      │
+ │                         compact SessionList · compact SettingsPanel ·    │
+ │                         Playground (canvas)                              │
  └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **The main process owns all I/O**: file reads and watching, HTTP polling, and credentials. It pushes typed `AccountSnapshot`s to the renderer.
 - The **renderer only displays data**. It runs with `contextIsolation: true` and `nodeIntegration: false`, and can reach main only through the `window.gauges` bridge.
+- **Window modes**: `App` renders `MiniApp` when `config.windowMode === 'mini'`, and the usual layout otherwise. Switching modes is an ordinary `setConfig({ windowMode })` call. In main, `applyWindowConfig` notices the mode change and applies that mode's geometry (aspect-ratio lock, minimum size, saved or default bounds). It uses `windowGeometryForMode` from `src/main/window-mode.ts`. Bounds are saved under `boundsKeyForMode(mode)`.
+- **Mini logic is kept apart from the DOM**: carousel index and wheel math, the spawn rate, the pet simulation, and the sprites live in plain `.ts` modules with no DOM types. They are unit-tested in Vitest's node environment. Only `Carousel.tsx` and `Playground.tsx` touch the DOM (wheel listener, `requestAnimationFrame`, canvas, `ResizeObserver`).
 - Types shared by all three layers live in `src/shared/types.ts`. IPC channel names live in one place, `src/shared/ipc-channels.ts`.
 - Every source is fault-tolerant:
   - A malformed JSONL line is skipped.
@@ -129,13 +191,22 @@ Everything is read-only. The app never writes to a Claude Code config directory.
 
 ```
 src/
-  main/       index.ts (window, lifecycle), ipc.ts, config-store.ts,
+  main/       index.ts (window, lifecycle, mode switching), ipc.ts,
+              config-store.ts, window-mode.ts (per-mode geometry/bounds key),
               account-monitor.ts, aggregator.ts
   main/sources/  account-reader.ts, sessions-registry.ts,
                  transcript-tail.ts, usage-api.ts
   preload/    index.ts (contextBridge API), index.d.ts
   renderer/   App.tsx, store.ts, api.ts, styles.css, theme.ts,
               components/, utils/
+  renderer/mini/
+              MiniApp.tsx        mini shell: drag strip, state messages, screen list
+              Carousel.tsx       infinite carousel: wheel, arrow keys, pager dots, ARIA
+              carousel-logic.ts  nextIndex wrap, visibleSlots, wheel-gesture reducer
+              Playground.tsx     canvas + rAF loop, resize, visibility/reduced-motion
+              playground-sim.ts  pure pet/folder simulation (injectable rng)
+              spawn-rate.ts      effortWeight, folderSpawnIntervalMs
+              sprites.ts         pixel-art pet/folder sprites, drawSprite
   shared/     types.ts, ipc-channels.ts
 tests/        Vitest unit tests + sanitized fixtures (fake tokens only)
 ```
