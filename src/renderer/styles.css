@@ -26,6 +26,10 @@
   --status-idle: var(--color-text-muted);
   --status-error: var(--gauge-critical);
 
+  /* Scrollbar tokens (max window) */
+  --scrollbar-size: 4px;
+  --scrollbar-thumb: rgb(255 255 255 / 0.12);
+
   --radius: 8px;
   --space-1: 4px;
   --space-2: 8px;
@@ -795,6 +799,28 @@ button {
 .playground-counter {
   color: var(--color-accent);
   font-variant-numeric: tabular-nums;
+}
+
+/* Max window scrollbars
+   Webkit pseudo-elements only: Chromium 121+ ignores them on any element that
+   sets scrollbar-width or scrollbar-color, so those must stay unset here. */
+.app:not(.mini) .app-main::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  background: transparent;
+}
+
+.app:not(.mini) .app-main::-webkit-scrollbar-track,
+.app:not(.mini) .app-main::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.app:not(.mini) .app-main::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.app:not(.mini) .app-main:hover::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
 }
 
 /* ==========================================================================
