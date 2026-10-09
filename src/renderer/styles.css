@@ -348,6 +348,62 @@ button {
   color: var(--color-accent);
 }
 
+/* Compact session list (mini mode): one line per session, never scrolls */
+.session-panel--compact {
+  overflow: hidden;
+}
+
+.session-list--compact {
+  gap: var(--space-1);
+}
+
+.session-row--compact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 2px var(--space-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.session-row--compact .session-repo {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.session-row--compact .session-model {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-row--compact .effort-badge {
+  flex: 0 0 auto;
+  line-height: 16px;
+}
+
+.session-status-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-idle);
+}
+.session-status-dot--busy {
+  background: var(--status-busy);
+}
+.session-status-dot--waiting {
+  background: var(--status-waiting);
+}
+
+.session-more {
+  margin: var(--space-1) 0 0;
+  font-size: 11px;
+  text-align: center;
+}
+
 /* Usage gauges */
 .usage-panel-head {
   display: flex;
