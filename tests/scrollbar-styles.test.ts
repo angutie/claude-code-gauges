@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -122,4 +123,64 @@ describe('max window scrollbar styles', () => {
     expect(root?.declarations.get('--scrollbar-size')).toBe('4px')
     expect(root?.declarations.get('--scrollbar-thumb')).toBeTruthy()
   })
+})
+
+describe('max scrollbar integration: scrolling and the mini layout stay intact', () => {
+  it('keeps the scroller overflow values so scrolling still works', () => {
+    const [appMain] = rulesFor(/^\.app-main$/)
+    const [appTabs] = rulesFor(/^\.app-tabs$/)
+    expect(appMain?.declarations.get('overflow-y')).toBe('auto')
+    expect(appTabs?.declarations.get('overflow-x')).toBe('auto')
+    // No other rule targeting the scrollers themselves may switch them to hidden/clip.
+    for (const scroller of SCROLLERS) {
+      for (const rule of rulesFor(new RegExp(`${scroller.replace('.', '\\.')}$`))) {
+        for (const prop of ['overflow', 'overflow-x', 'overflow-y']) {
+          expect(rule.declarations.get(prop) ?? '', rule.selectors.join(', ')).not.toMatch(
+            /hidden|clip/
+          )
+        }
+      }
+    }
+  })
+
+  it('styles the scrollbars without removing them (no display:none or zero size)', () => {
+    for (const rule of rulesFor(/::-webkit-scrollbar/)) {
+      expect(rule.declarations.get('display'), rule.selectors.join(', ')).not.toBe('none')
+      for (const prop of ['width', 'height']) {
+        expect(rule.declarations.get(prop) ?? 'unset', rule.selectors.join(', ')).not.toMatch(
+          /^0(px)?$/
+        )
+      }
+    }
+  })
+
+  it('adds no scrollbar styling or scrollable overflow to the mini section', () => {
+    const mini = source.slice(miniBannerOffset)
+    expect(mini).not.toMatch(/::-webkit-scrollbar|scrollbar-(width|color|gutter)/)
+    expect(mini).not.toMatch(/overflow(-x|-y)?\s*:\s*(auto|scroll)/)
+    expect(mini).toMatch(/overflow\s*:\s*hidden/)
+  })
+
+  // Byte-for-byte guard against the branch point with main; skipped when git/main is unavailable.
+  const baseMini = ((): string | undefined => {
+    try {
+      const cwd = resolve(__dirname, '..')
+      const git = (args: string[]): string =>
+        execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      const base = git(['merge-base', 'HEAD', 'main']).trim()
+      const baseCss = git(['show', `${base}:src/renderer/styles.css`])
+      const at = baseCss.indexOf('Mini window (1:1)')
+      return at === -1 ? undefined : baseCss.slice(at)
+    } catch {
+      return undefined
+    }
+  })()
+
+  it.skipIf(baseMini === undefined)(
+    'leaves the mini section byte-for-byte unchanged versus the base branch',
+    () => {
+      const normalize = (text: string): string => text.replace(/\r\n/g, '\n')
+      expect(normalize(css.slice(miniBannerOffset))).toBe(normalize(baseMini ?? ''))
+    }
+  )
 })
