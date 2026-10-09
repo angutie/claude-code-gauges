@@ -4,8 +4,23 @@
  * is built from the renderer's own constants so it cannot drift from the UI.
  */
 
-import type { WidgetKey, WindowMode } from '../shared/types'
+import type {
+  EffortLevel,
+  SessionStatus,
+  UsageStatus,
+  WidgetKey,
+  WindowMode
+} from '../shared/types'
 import { createEmptyConfig } from './api'
+import { USAGE_THRESHOLDS } from './theme'
+import { MAX_FOLDERS } from './mini/playground-sim'
+import {
+  BASE_SPAWN_INTERVAL_MS,
+  DEFAULT_EFFORT_WEIGHT,
+  effortWeight,
+  MAX_SPAWN_INTERVAL_MS,
+  MIN_SPAWN_INTERVAL_MS
+} from './mini/spawn-rate'
 import {
   MAX_POLL_SECONDS,
   MIN_POLL_SECONDS,
@@ -36,6 +51,8 @@ export interface HelpSection {
   readonly title: string
   readonly paragraphs: readonly HelpParagraph[]
   readonly entries?: readonly HelpEntry[]
+  /** Ids of settings entries (see SETTINGS_ENTRY_IDS) that affect this section. */
+  readonly relatedSettings?: readonly string[]
 }
 
 export interface HelpTopic {
@@ -149,9 +166,7 @@ export const GETTING_STARTED_TOPIC: HelpTopic = {
     {
       id: 'choosing-what-to-track',
       title: 'Choosing what to track',
-      paragraphs: [
-        ['Pick what the gauges and session list follow:']
-      ],
+      paragraphs: [['Pick what the gauges and session list follow:']],
       entries: [
         {
           id: 'account-tabs',
@@ -169,9 +184,7 @@ export const GETTING_STARTED_TOPIC: HelpTopic = {
             [
               `Under the tabs, keep "${ALL_SESSIONS_LABEL}" checked to follow every live session of the account, or uncheck it and tick individual sessions. Your choice is remembered per account.`
             ],
-            [
-              'The picker is hidden while the Session list widget is turned off in Settings.'
-            ]
+            ['The picker is hidden while the Session list widget is turned off in Settings.']
           ]
         }
       ]
@@ -256,11 +269,9 @@ export const SETTINGS_TOPIC: HelpTopic = {
           id: 'windowMode',
           term: `Window size (${WINDOW_MODE_OPTIONS.map((option) => option.label).join(' / ')})`,
           body: [
-            ...WINDOW_MODE_OPTIONS.map(
-              ({ mode, label, glyph }): HelpParagraph => [
-                `${glyph} ${label}: ${WINDOW_MODE_DESCRIPTIONS[mode]}`
-              ]
-            ),
+            ...WINDOW_MODE_OPTIONS.map(({ mode, label, glyph }): HelpParagraph => [
+              `${glyph} ${label}: ${WINDOW_MODE_DESCRIPTIONS[mode]}`
+            ]),
             [
               `Each size remembers its own position and dimensions. Default: ${windowModeLabel(DEFAULT_CONFIG.windowMode)}.`
             ]
@@ -276,7 +287,200 @@ export const SETTINGS_ENTRY_IDS: readonly string[] = SETTINGS_TOPIC.sections.fla
   (section.entries ?? []).map((entry) => entry.id)
 )
 
-export const HELP_TOPICS: readonly HelpTopic[] = [GETTING_STARTED_TOPIC, SETTINGS_TOPIC]
+/** Looks up a settings entry's display label by id; undefined for unknown ids. */
+export function settingsEntryLabel(id: string): string | undefined {
+  for (const section of SETTINGS_TOPIC.sections) {
+    const entry = section.entries?.find((e) => e.id === id)
+    if (entry) return entry.term
+  }
+  return undefined
+}
+
+/** "Related settings: A, B." paragraph so the cross-reference is visible in the panel. */
+function relatedSettingsParagraph(ids: readonly string[]): HelpParagraph {
+  const labels = ids.map((id) => settingsEntryLabel(id) ?? id)
+  return [`Related settings: ${labels.join(', ')}.`]
+}
+
+const seconds = (ms: number): string => `${ms / 1000} s`
+
+/** What each usage status means on screen; a Record so new statuses must be documented. */
+export const USAGE_STATUS_DESCRIPTIONS: Readonly<Record<UsageStatus, string>> = {
+  ok: 'Fresh data from the latest poll.',
+  loading: 'No result yet; the first poll is still running.',
+  stale:
+    'The last refresh failed (network error or rate limit). Gauges are dimmed and keep the last good values until the next successful poll.',
+  expired:
+    'The account’s login token expired. Run claude in a terminal for that account to refresh it.',
+  error: 'An unexpected failure; the message shown explains what went wrong.',
+  unavailable: 'No credentials were found for the account, so usage cannot be fetched.'
+}
+
+/** What each session status means; a Record so new statuses must be documented. */
+export const SESSION_STATUS_DESCRIPTIONS: Readonly<Record<SessionStatus, string>> = {
+  busy: 'Claude is working on a turn right now.',
+  idle: 'The session is open and has finished its last turn.',
+  waiting: 'Claude needs you, e.g. to answer a permission prompt. The reason is shown when known.',
+  unknown: 'The app cannot tell the session’s state yet.'
+}
+
+/** Every known effort level, lowest first; a Record so a new level fails to compile until listed. */
+const EFFORT_LEVEL_RANK: Readonly<Record<EffortLevel, number>> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  max: 3
+}
+export const EFFORT_LEVELS: readonly EffortLevel[] = (
+  Object.keys(EFFORT_LEVEL_RANK) as EffortLevel[]
+).sort((a, b) => EFFORT_LEVEL_RANK[a] - EFFORT_LEVEL_RANK[b])
+
+/** Settings entries (by id) that change what each feature shows. */
+export const FEATURE_RELATED_SETTINGS = {
+  gauges: ['usage5h', 'usageWeekly', 'usagePollSeconds'],
+  sessions: ['sessions', 'status', 'model', 'effort', 'branch'],
+  playground: ['windowMode']
+} as const satisfies Readonly<Record<string, readonly string[]>>
+
+const effortWeightsText = EFFORT_LEVELS.map((level) => `${level} = ${effortWeight(level)}`).join(
+  ', '
+)
+
+const statusParagraphs = <S extends string>(
+  descriptions: Readonly<Record<S, string>>
+): HelpParagraph[] =>
+  (Object.keys(descriptions) as S[]).map((status) => [code(status), `: ${descriptions[status]}`])
+
+export const FEATURES_TOPIC: HelpTopic = {
+  id: 'features',
+  title: 'Features',
+  sections: [
+    {
+      id: 'gauges',
+      title: 'Usage gauges',
+      relatedSettings: FEATURE_RELATED_SETTINGS.gauges,
+      paragraphs: [
+        [
+          'Show how much of your plan’s usage limits the selected account has used, with a countdown to each reset.'
+        ],
+        relatedSettingsParagraph(FEATURE_RELATED_SETTINGS.gauges)
+      ],
+      entries: [
+        {
+          id: 'gauge-5h',
+          term: 'Session (5h)',
+          body: [['Usage in the rolling 5-hour window.']]
+        },
+        {
+          id: 'gauge-weekly',
+          term: 'Weekly',
+          body: [
+            [
+              'Usage in the weekly window. Separate Opus and Sonnet weekly bars appear only when your plan reports them.'
+            ]
+          ]
+        },
+        {
+          id: 'gauge-colors',
+          term: 'Colors',
+          body: [
+            [
+              `Normal below ${USAGE_THRESHOLDS.warning}%, warning from ${USAGE_THRESHOLDS.warning}% up to ${USAGE_THRESHOLDS.critical}%, critical above ${USAGE_THRESHOLDS.critical}%. A gauge without a value shows as unknown.`
+            ]
+          ]
+        },
+        {
+          id: 'gauge-statuses',
+          term: 'Usage status',
+          body: statusParagraphs(USAGE_STATUS_DESCRIPTIONS)
+        },
+        {
+          id: 'gauge-refresh',
+          term: 'Refreshing',
+          body: [['Usage refreshes every poll interval and whenever the window regains focus.']]
+        }
+      ]
+    },
+    {
+      id: 'sessions',
+      title: 'Sessions list',
+      relatedSettings: FEATURE_RELATED_SETTINGS.sessions,
+      paragraphs: [
+        [
+          'Lists the live Claude Code sessions of the selected account (or only those ticked in the session picker), one row per working folder.'
+        ],
+        relatedSettingsParagraph(FEATURE_RELATED_SETTINGS.sessions)
+      ],
+      entries: [
+        {
+          id: 'session-status',
+          term: 'Status',
+          body: statusParagraphs(SESSION_STATUS_DESCRIPTIONS)
+        },
+        {
+          id: 'session-model',
+          term: 'Model',
+          body: [['The model used for the session’s latest reply, shown with a friendly name.']]
+        },
+        {
+          id: 'session-effort',
+          term: 'Effort',
+          body: [
+            [
+              `The reasoning effort level (${EFFORT_LEVELS.join(', ')}). “(default)” means it comes from your `,
+              code('settings.json'),
+              ' rather than from the session itself.'
+            ]
+          ]
+        },
+        {
+          id: 'session-branch',
+          term: 'Git branch',
+          body: [['The git branch of the session’s working folder, when it is a git repository.']]
+        }
+      ]
+    },
+    {
+      id: 'playground',
+      title: 'Playground (mini only)',
+      relatedSettings: FEATURE_RELATED_SETTINGS.playground,
+      paragraphs: [
+        [
+          'A small animated playground available only in the mini window, as its last screen. Pets chase folders that appear while your sessions are working. It follows session status and effort even when those widgets are turned off.'
+        ],
+        relatedSettingsParagraph(FEATURE_RELATED_SETTINGS.playground)
+      ],
+      entries: [
+        {
+          id: 'playground-spawn-rate',
+          term: 'How fast folders appear',
+          body: [
+            [
+              'Only busy sessions count; idle, waiting and unknown sessions add nothing, so no folders appear when no session is busy.'
+            ],
+            [
+              `Each busy session adds a weight by effort: ${effortWeightsText} (anything else counts as ${DEFAULT_EFFORT_WEIGHT}).`
+            ],
+            [
+              `A new folder appears every ${seconds(BASE_SPAWN_INTERVAL_MS)} ÷ total weight, kept between ${seconds(MIN_SPAWN_INTERVAL_MS)} and ${seconds(MAX_SPAWN_INTERVAL_MS)}.`
+            ]
+          ]
+        },
+        {
+          id: 'playground-max-folders',
+          term: 'Folder limit',
+          body: [[`At most ${MAX_FOLDERS} folders are on screen at once.`]]
+        }
+      ]
+    }
+  ]
+}
+
+export const HELP_TOPICS: readonly HelpTopic[] = [
+  GETTING_STARTED_TOPIC,
+  SETTINGS_TOPIC,
+  FEATURES_TOPIC
+]
 
 export function getHelpTopics(): readonly HelpTopic[] {
   return HELP_TOPICS
