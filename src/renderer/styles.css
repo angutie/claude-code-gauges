@@ -621,3 +621,87 @@ button {
   border-radius: var(--radius);
   color: var(--color-text);
 }
+
+/* Carousel (mini window) */
+.carousel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  outline: none;
+}
+
+.carousel:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+.carousel-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.carousel-slide {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transition: transform 280ms ease;
+  will-change: transform;
+}
+
+.carousel-slide--prev {
+  transform: translateX(-100%);
+}
+
+.carousel-slide--current {
+  transform: translateX(0);
+}
+
+.carousel-slide--next {
+  transform: translateX(100%);
+}
+
+.carousel-slide--instant {
+  transition: none;
+}
+
+.carousel-pager {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  flex-shrink: 0;
+}
+
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-border);
+  cursor: pointer;
+}
+
+.carousel-dot:hover {
+  background: var(--color-text-muted);
+}
+
+.carousel-dot--active {
+  background: var(--color-accent);
+}
+
+.carousel-dot:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carousel-slide {
+    transition: none;
+  }
+}
