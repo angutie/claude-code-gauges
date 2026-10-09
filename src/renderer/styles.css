@@ -622,6 +622,59 @@ button {
   color: var(--color-text);
 }
 
+/* Window mode segmented toggle (min / max) */
+.segmented {
+  display: inline-flex;
+  margin-top: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+}
+
+.segmented-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-3);
+  background: var(--color-surface-raised);
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.segmented-option + .segmented-option {
+  border-left: 1px solid var(--color-border);
+}
+
+.segmented-option[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  cursor: default;
+}
+
+.segmented-glyph {
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+/* Compact settings (mini window) */
+.settings-widget-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-2);
+}
+
+.settings-widget-grid .checkbox-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-panel--compact .settings-group {
+  margin-top: var(--space-1);
+}
+
 /* Carousel (mini window) */
 .carousel {
   position: relative;

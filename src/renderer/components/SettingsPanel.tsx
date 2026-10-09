@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { AppConfig, WidgetKey, WidgetToggles } from '../../shared/types'
+import type { AppConfig, WidgetKey, WidgetToggles, WindowMode } from '../../shared/types'
 
 // Mirrors the limits enforced by the main-process config store.
 export const MIN_POLL_SECONDS = 60
@@ -23,6 +23,41 @@ export function clampPollSeconds(value: string | number): number | null {
   return Math.min(MAX_POLL_SECONDS, Math.max(MIN_POLL_SECONDS, Math.round(parsed)))
 }
 
+/** Segmented window-mode options; labels deliberately avoid "minimize/maximize". */
+export const WINDOW_MODE_OPTIONS: ReadonlyArray<{ mode: WindowMode; label: string; glyph: string }> = [
+  { mode: 'mini', label: 'min', glyph: '▢' },
+  { mode: 'max', label: 'max', glyph: '▣' }
+]
+
+export interface WindowModeToggleProps {
+  mode: WindowMode
+  onChange: (mode: WindowMode) => void
+}
+
+/** Two-button segmented control switching between the mini and max window. */
+export function WindowModeToggle({ mode, onChange }: WindowModeToggleProps): React.JSX.Element {
+  return (
+    <div className="segmented" role="group" aria-label="Window size">
+      {WINDOW_MODE_OPTIONS.map((option) => (
+        <button
+          key={option.mode}
+          type="button"
+          className="segmented-option"
+          aria-pressed={option.mode === mode}
+          onClick={() => {
+            if (option.mode !== mode) onChange(option.mode)
+          }}
+        >
+          <span className="segmented-glyph" aria-hidden="true">
+            {option.glyph}
+          </span>
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /**
  * Reads an input's value without relying on DOM lib typings: tests pull this
  * file into the Node tsconfig, which has no DOM lib.
@@ -31,13 +66,22 @@ function inputValue(target: unknown): string {
   return String((target as { value?: unknown }).value ?? '')
 }
 
+type SettingsConfig = Pick<AppConfig, 'widgets' | 'usagePollSeconds' | 'alwaysOnTop' | 'windowMode'>
+
 export interface SettingsPanelProps {
-  config: Pick<AppConfig, 'widgets' | 'usagePollSeconds' | 'alwaysOnTop'>
-  onChange: (patch: Partial<Pick<AppConfig, 'widgets' | 'usagePollSeconds' | 'alwaysOnTop'>>) => void
+  config: SettingsConfig
+  onChange: (patch: Partial<SettingsConfig>) => void
   onClose?: () => void
+  /** Condensed layout for the mini window: 2-column widget grid, no Done button. */
+  compact?: boolean
 }
 
-export function SettingsPanel({ config, onChange, onClose }: SettingsPanelProps): React.JSX.Element {
+export function SettingsPanel({
+  config,
+  onChange,
+  onClose,
+  compact = false
+}: SettingsPanelProps): React.JSX.Element {
   const [pollDraft, setPollDraft] = useState(String(config.usagePollSeconds))
 
   useEffect(() => {
@@ -60,10 +104,13 @@ export function SettingsPanel({ config, onChange, onClose }: SettingsPanelProps)
   }
 
   return (
-    <section className="panel settings-panel" aria-label="Settings">
+    <section
+      className={`panel settings-panel${compact ? ' settings-panel--compact' : ''}`}
+      aria-label="Settings"
+    >
       <div className="settings-panel-head">
         <h2 className="panel-title">Settings</h2>
-        {onClose && (
+        {onClose && !compact && (
           <button type="button" className="button" onClick={onClose}>
             Done
           </button>
@@ -72,12 +119,14 @@ export function SettingsPanel({ config, onChange, onClose }: SettingsPanelProps)
 
       <fieldset className="settings-group">
         <legend className="settings-legend">Widgets</legend>
-        {WIDGET_OPTIONS.map(({ key, label }) => (
-          <label key={key} className="checkbox-row">
-            <input type="checkbox" checked={config.widgets[key]} onChange={() => toggleWidget(key)} />
-            <span>{label}</span>
-          </label>
-        ))}
+        <div className={compact ? 'settings-widget-grid' : undefined}>
+          {WIDGET_OPTIONS.map(({ key, label }) => (
+            <label key={key} className="checkbox-row">
+              <input type="checkbox" checked={config.widgets[key]} onChange={() => toggleWidget(key)} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
       </fieldset>
 
       <fieldset className="settings-group">
@@ -98,9 +147,11 @@ export function SettingsPanel({ config, onChange, onClose }: SettingsPanelProps)
             }}
           />
         </label>
-        <p className="muted settings-hint">
-          Between {MIN_POLL_SECONDS} and {MAX_POLL_SECONDS} seconds.
-        </p>
+        {!compact && (
+          <p className="muted settings-hint">
+            Between {MIN_POLL_SECONDS} and {MAX_POLL_SECONDS} seconds.
+          </p>
+        )}
       </fieldset>
 
       <fieldset className="settings-group">
@@ -113,6 +164,7 @@ export function SettingsPanel({ config, onChange, onClose }: SettingsPanelProps)
           />
           <span>Always on top</span>
         </label>
+        <WindowModeToggle mode={config.windowMode} onChange={(windowMode) => onChange({ windowMode })} />
       </fieldset>
     </section>
   )
