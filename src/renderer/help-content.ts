@@ -1,7 +1,17 @@
 /**
  * Help content as typed data. Pure module (no DOM, no React) so it compiles
- * under tsconfig.node.json and tests can assert on it directly.
+ * under tsconfig.node.json and tests can assert on it directly. Settings text
+ * is built from the renderer's own constants so it cannot drift from the UI.
  */
+
+import type { WidgetKey, WindowMode } from '../shared/types'
+import { createEmptyConfig } from './api'
+import {
+  MAX_POLL_SECONDS,
+  MIN_POLL_SECONDS,
+  WIDGET_OPTIONS,
+  WINDOW_MODE_OPTIONS
+} from './components/SettingsPanel'
 
 /** Inline code, rendered as `<code>` by the help UI. */
 export interface HelpCode {
@@ -169,7 +179,104 @@ export const GETTING_STARTED_TOPIC: HelpTopic = {
   ]
 }
 
-export const HELP_TOPICS: readonly HelpTopic[] = [GETTING_STARTED_TOPIC]
+/** What each widget toggle controls; a Record so a new widget key fails to compile until documented. */
+export const WIDGET_DESCRIPTIONS: Readonly<Record<WidgetKey, string>> = {
+  usage5h: 'Shows the gauge for the rolling 5-hour usage window and when it resets.',
+  usageWeekly:
+    'Shows the weekly usage gauge, plus Opus / Sonnet weekly bars when your plan reports them.',
+  sessions:
+    'Shows the list of live Claude Code sessions for the selected account. Turning it off also hides the session picker.',
+  model: 'Shows which model each session is using.',
+  effort: 'Shows each session’s reasoning effort level (low, medium, high or max).',
+  branch: 'Shows the git branch of each session’s working folder.',
+  status: 'Shows whether each session is busy, idle or waiting for you.'
+}
+
+const DEFAULT_CONFIG = createEmptyConfig()
+
+const onOff = (value: boolean): string => (value ? 'on' : 'off')
+
+const WINDOW_MODE_DESCRIPTIONS: Readonly<Record<WindowMode, string>> = {
+  mini: 'a small square window with swipeable screens. Text scales with the window and nothing scrolls.',
+  max: 'the full window with account tabs, the session picker and the complete settings panel.'
+}
+
+const windowModeLabel = (mode: WindowMode): string =>
+  WINDOW_MODE_OPTIONS.find((option) => option.mode === mode)?.label ?? mode
+
+export const SETTINGS_TOPIC: HelpTopic = {
+  id: 'settings',
+  title: 'Settings reference',
+  sections: [
+    {
+      id: 'widgets',
+      title: 'Widgets',
+      paragraphs: [
+        ['Turn individual parts of the display on or off. Changes apply immediately and are saved.']
+      ],
+      entries: WIDGET_OPTIONS.map(({ key, label }) => ({
+        id: key,
+        term: label,
+        body: [[WIDGET_DESCRIPTIONS[key]], [`Default: ${onOff(DEFAULT_CONFIG.widgets[key])}.`]]
+      }))
+    },
+    {
+      id: 'usage',
+      title: 'Usage',
+      paragraphs: [],
+      entries: [
+        {
+          id: 'usagePollSeconds',
+          term: 'Poll interval (seconds)',
+          body: [
+            [
+              'How often usage limits are refreshed from Anthropic. Usage also refreshes when the window regains focus.'
+            ],
+            [
+              `Between ${MIN_POLL_SECONDS} and ${MAX_POLL_SECONDS} seconds; values outside that range are clamped. Default: ${DEFAULT_CONFIG.usagePollSeconds} seconds.`
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      id: 'window',
+      title: 'Window',
+      paragraphs: [],
+      entries: [
+        {
+          id: 'alwaysOnTop',
+          term: 'Always on top',
+          body: [
+            ['Keeps the gauges window above other windows so it stays visible while you work.'],
+            [`Default: ${onOff(DEFAULT_CONFIG.alwaysOnTop)}.`]
+          ]
+        },
+        {
+          id: 'windowMode',
+          term: `Window size (${WINDOW_MODE_OPTIONS.map((option) => option.label).join(' / ')})`,
+          body: [
+            ...WINDOW_MODE_OPTIONS.map(
+              ({ mode, label, glyph }): HelpParagraph => [
+                `${glyph} ${label}: ${WINDOW_MODE_DESCRIPTIONS[mode]}`
+              ]
+            ),
+            [
+              `Each size remembers its own position and dimensions. Default: ${windowModeLabel(DEFAULT_CONFIG.windowMode)}.`
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+/** Ids of every settings entry, for cross-references from other topics. */
+export const SETTINGS_ENTRY_IDS: readonly string[] = SETTINGS_TOPIC.sections.flatMap((section) =>
+  (section.entries ?? []).map((entry) => entry.id)
+)
+
+export const HELP_TOPICS: readonly HelpTopic[] = [GETTING_STARTED_TOPIC, SETTINGS_TOPIC]
 
 export function getHelpTopics(): readonly HelpTopic[] {
   return HELP_TOPICS
