@@ -1,11 +1,19 @@
-import { createElement, isValidElement, type ReactElement } from 'react'
+import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { AccountSnapshot, AppConfig, SessionInfo } from '../src/shared/types'
 import App from '../src/renderer/App'
 import { createEmptyConfig, createFallbackApi } from '../src/renderer/api'
 import type { SettingsPanelProps } from '../src/renderer/components/SettingsPanel'
-import { MINI_SCREEN_IDS, MiniApp, miniScreens, screensForMode } from '../src/renderer/mini/MiniApp'
+import type { HelpPanelProps } from '../src/renderer/components/HelpPanel'
+import {
+  MINI_SCREEN_IDS,
+  MiniApp,
+  MiniDragStrip,
+  miniMainContent,
+  miniScreens,
+  screensForMode
+} from '../src/renderer/mini/MiniApp'
 import { createGaugesStore, type GaugesStore } from '../src/renderer/store'
 
 function makeConfig(patch: Partial<AppConfig> = {}): AppConfig {
@@ -189,6 +197,69 @@ describe('MiniApp', () => {
     const html = renderToStaticMarkup(createElement(MiniApp, { store }))
     expect(html).toContain('Could not load data: boom')
     expect(html).toContain('state-message--error')
+  })
+})
+
+function helpButtonMarkup(html: string): string | undefined {
+  return html.match(/<button[^>]*aria-label="Help"[^>]*>\?<\/button>/)?.[0]
+}
+
+describe('mini "?" help button', () => {
+  async function errorStore(): Promise<GaugesStore> {
+    const api = createFallbackApi(makeConfig())
+    api.getConfig = async () => {
+      throw new Error('boom')
+    }
+    const store = createGaugesStore(api)
+    await store.init()
+    return store
+  }
+
+  it.each([
+    ['ready', () => readyStore(makeConfig())],
+    ['error', errorStore],
+    ['no-account', () => readyStore(makeConfig({ accounts: [], activeAccountId: null }), [])]
+  ])('renders a collapsed "?" button in the drag strip in the %s state', async (_name, make) => {
+    const html = renderToStaticMarkup(createElement(MiniApp, { store: await make() }))
+    const strip = html.slice(html.indexOf('mini-drag-strip'), html.indexOf('mini-main'))
+    const button = helpButtonMarkup(strip)
+    expect(button).toBeDefined()
+    expect(button).toContain('aria-expanded="false"')
+    expect(html).not.toContain('help-panel--compact')
+  })
+
+  it('toggles help from the drag strip button', () => {
+    let toggles = 0
+    const strip = MiniDragStrip({ accountLabel: null, helpOpen: false, onToggleHelp: () => toggles++ })
+    const findButton = (node: ReactNode): ReactElement<{ onClick: () => void }> | undefined => {
+      if (Array.isArray(node)) return node.map(findButton).find(Boolean)
+      if (!isValidElement(node)) return undefined
+      if (node.type === 'button') return node as ReactElement<{ onClick: () => void }>
+      return findButton((node.props as { children?: ReactNode }).children)
+    }
+    const button = findButton(strip)
+    expect(button).toBeDefined()
+    button?.props.onClick()
+    expect(toggles).toBe(1)
+    const open = renderToStaticMarkup(
+      createElement(MiniDragStrip, { accountLabel: 'me', helpOpen: true, onToggleHelp: noop })
+    )
+    expect(helpButtonMarkup(open)).toContain('aria-expanded="true"')
+    expect(open).toContain('mini-account-label')
+  })
+
+  it('swaps mini-main content for the compact HelpPanel and closes back to it', () => {
+    const previous = createElement('p', null, 'previous view')
+    let closed = 0
+    const help = miniMainContent(true, () => closed++, previous)
+    expect(isValidElement(help)).toBe(true)
+    const html = renderScreen(help)
+    expect(html).toContain('help-panel--compact')
+    expect(html).toContain('Done')
+    expect(html).not.toContain('previous view')
+    ;(help as ReactElement<HelpPanelProps>).props.onClose?.()
+    expect(closed).toBe(1)
+    expect(miniMainContent(false, noop, previous)).toBe(previous)
   })
 })
 
